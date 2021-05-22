@@ -71,6 +71,8 @@ object PreferenceKeys {
 
     const val pageLayout = "page_layout"
 
+    const val automaticSplitsPage = "automatic_splits_page"
+
     const val invertDoublePages = "invert_double_pages"
 
     const val readerBottomButtons = "reader_bottom_buttons"
