@@ -5,20 +5,28 @@ import androidx.preference.PreferenceManager
 import eu.kanade.tachiyomi.data.backup.BackupCreatorJob
 import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.data.library.LibraryUpdateJob
+import eu.kanade.tachiyomi.data.preference.Preference
 import eu.kanade.tachiyomi.data.preference.PreferenceKeys
+import eu.kanade.tachiyomi.data.preference.PreferenceStore
+import eu.kanade.tachiyomi.data.preference.PreferenceValues
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.data.preference.plusAssign
 import eu.kanade.tachiyomi.data.track.TrackManager
+import eu.kanade.tachiyomi.data.updater.AppDownloadInstallJob
 import eu.kanade.tachiyomi.data.updater.AppUpdateJob
-import eu.kanade.tachiyomi.data.updater.AppUpdateService
 import eu.kanade.tachiyomi.extension.ExtensionUpdateJob
 import eu.kanade.tachiyomi.network.PREF_DOH_CLOUDFLARE
 import eu.kanade.tachiyomi.ui.library.LibraryPresenter
+import eu.kanade.tachiyomi.ui.library.LibrarySort
 import eu.kanade.tachiyomi.ui.reader.settings.OrientationType
+import eu.kanade.tachiyomi.ui.recents.RecentsPresenter
+import eu.kanade.tachiyomi.util.system.launchIO
 import eu.kanade.tachiyomi.util.system.toast
+import kotlinx.coroutines.CoroutineScope
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
+import kotlin.math.max
 
 object Migrations {
 
@@ -28,11 +36,15 @@ object Migrations {
      * @param preferences Preferences of the application.
      * @return true if a migration is performed, false otherwise.
      */
-    fun upgrade(preferences: PreferencesHelper): Boolean {
+    fun upgrade(
+        preferences: PreferencesHelper,
+        preferenceStore: PreferenceStore,
+        scope: CoroutineScope,
+    ): Boolean {
         val context = preferences.context
         val prefs = PreferenceManager.getDefaultSharedPreferences(context)
         prefs.edit {
-            remove(AppUpdateService.NOTIFY_ON_INSTALL_KEY)
+            remove(AppDownloadInstallJob.NOTIFY_ON_INSTALL_KEY)
         }
         val oldVersion = preferences.lastVersionCode().get()
         if (oldVersion < BuildConfig.VERSION_CODE) {
@@ -181,6 +193,71 @@ object Migrations {
                 if (updateInterval in listOf(3, 4, 6, 8)) {
                     preferences.libraryUpdateInterval().set(12)
                     LibraryUpdateJob.setupTask(context, 12)
+                }
+            }
+            if (oldVersion < 88) {
+                scope.launchIO {
+                    LibraryPresenter.updateRatiosAndColors()
+                }
+                val oldReaderTap = prefs.getBoolean("reader_tap", true)
+                if (!oldReaderTap) {
+                    preferences.navigationModePager().set(5)
+                    preferences.navigationModeWebtoon().set(5)
+                }
+            }
+            if (oldVersion < 90) {
+                val oldSecureScreen = prefs.getBoolean("secure_screen", false)
+                if (oldSecureScreen) {
+                    preferences.secureScreen().set(PreferenceValues.SecureScreenMode.ALWAYS)
+                }
+            }
+            if (oldVersion < 97) {
+                val oldDLAfterReading = prefs.getInt("auto_download_after_reading", 0)
+                if (oldDLAfterReading > 0) {
+                    preferences.autoDownloadWhileReading().set(max(2, oldDLAfterReading))
+                }
+            }
+            if (oldVersion < 102) {
+                val oldGroupHistory = prefs.getBoolean("group_chapters_history", true)
+                if (!oldGroupHistory) {
+                    preferences.groupChaptersHistory().set(RecentsPresenter.GroupType.Never)
+                }
+            }
+            if (oldVersion < 105) {
+                LibraryUpdateJob.cancelAllWorks(context)
+                LibraryUpdateJob.setupTask(context)
+            }
+            if (oldVersion < 108) {
+                preferenceStore.getAll()
+                    .filter { it.key.startsWith("pref_mangasync_") || it.key.startsWith("track_token_") }
+                    .forEach { (key, value) ->
+                        if (value is String) {
+                            preferenceStore
+                                .getString(Preference.privateKey(key))
+                                .set(value)
+
+                            preferenceStore.getString(key).delete()
+                        }
+                    }
+            }
+            if (oldVersion < 110) {
+                try {
+                    val librarySortString = prefs.getString("library_sorting_mode", "")
+                    if (!librarySortString.isNullOrEmpty()) {
+                        prefs.edit {
+                            remove("library_sorting_mode")
+                            putInt(
+                                "library_sorting_mode",
+                                LibrarySort.deserialize(librarySortString).mainValue,
+                            )
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+            if (oldVersion < 111) {
+                prefs.edit {
+                    remove("trusted_signatures")
                 }
             }
 

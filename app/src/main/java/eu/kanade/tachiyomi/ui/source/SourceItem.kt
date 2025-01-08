@@ -26,7 +26,7 @@ class SourceItem(val source: CatalogueSource, header: LangItem? = null, val isPi
     }
 
     override fun isSwipeable(): Boolean {
-        return source.id != LocalSource.ID && header != null
+        return source.id != LocalSource.ID && header != null && header.code != SourcePresenter.LAST_USED_KEY
     }
 
     /**
@@ -34,7 +34,7 @@ class SourceItem(val source: CatalogueSource, header: LangItem? = null, val isPi
      */
     override fun createViewHolder(
         view: View,
-        adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>
+        adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>,
     ): SourceHolder {
         return SourceHolder(view, adapter as SourceAdapter)
     }
@@ -46,7 +46,7 @@ class SourceItem(val source: CatalogueSource, header: LangItem? = null, val isPi
         adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>,
         holder: SourceHolder,
         position: Int,
-        payloads: MutableList<Any>
+        payloads: MutableList<Any>,
     ) {
         holder.bind(this)
     }

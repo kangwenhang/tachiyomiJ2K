@@ -26,8 +26,11 @@ class BiometricActivity : BaseThemedActivity() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
                     AuthenticatorUtil.isAuthenticating = false
-                    if (fromSearch) finish()
-                    else finishAffinity()
+                    if (fromSearch) {
+                        finish()
+                    } else {
+                        finishAffinity()
+                    }
                 }
 
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -37,7 +40,7 @@ class BiometricActivity : BaseThemedActivity() {
                     preferences.lastUnlock().set(Date().time)
                     finish()
                 }
-            }
+            },
         )
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()

@@ -11,11 +11,13 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.data.image.coil.CoverViewTarget
+import eu.kanade.tachiyomi.data.image.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.databinding.MangaGridItemBinding
 import eu.kanade.tachiyomi.databinding.MigrationProcessItemBinding
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.ui.base.holder.BaseFlexibleViewHolder
+import eu.kanade.tachiyomi.ui.library.setFreeformCoverRatio
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsController
 import eu.kanade.tachiyomi.util.system.launchUI
 import eu.kanade.tachiyomi.util.view.setCards
@@ -28,7 +30,7 @@ import java.text.DecimalFormat
 
 class MigrationProcessHolder(
     private val view: View,
-    private val adapter: MigrationProcessAdapter
+    private val adapter: MigrationProcessAdapter,
 ) : BaseFlexibleViewHolder(view, adapter) {
 
     private val db: DatabaseHelper by injectLazy()
@@ -45,21 +47,26 @@ class MigrationProcessHolder(
         arrayOf(binding.migrationMangaCardFrom, binding.migrationMangaCardTo).forEach {
             setCards(adapter.showOutline, it.card, it.unreadDownloadBadge.badgeView)
         }
+        binding.migrationMangaCardFrom.title.maxLines = 1
+        binding.migrationMangaCardTo.title.maxLines = 1
     }
 
     fun bind(item: MigrationProcessItem) {
         this.item = item
         launchUI {
+            binding.migrationMangaCardFrom.setFreeformCoverRatio(item.manga.manga())
+            binding.migrationMangaCardTo.setFreeformCoverRatio(null)
+
             val manga = item.manga.manga()
             val source = item.manga.mangaSource()
 
             binding.migrationMenu.setVectorCompat(
                 R.drawable.ic_more_vert_24dp,
-                R.attr.colorOnBackground
+                R.attr.colorOnBackground,
             )
             binding.skipManga.setVectorCompat(
                 R.drawable.ic_close_24dp,
-                R.attr.colorOnBackground
+                R.attr.colorOnBackground,
             )
             binding.migrationMenu.isInvisible = true
             binding.skipManga.isVisible = true
@@ -71,8 +78,8 @@ class MigrationProcessHolder(
                         adapter.controller.router.pushController(
                             MangaDetailsController(
                                 manga,
-                                true
-                            ).withFadeTransaction()
+                                true,
+                            ).withFadeTransaction(),
                         )
                     }
                 }
@@ -104,8 +111,8 @@ class MigrationProcessHolder(
                             adapter.controller.router.pushController(
                                 MangaDetailsController(
                                     searchResult,
-                                    true
-                                ).withFadeTransaction()
+                                    true,
+                                ).withFadeTransaction(),
                             )
                         }
                     } else {
@@ -139,7 +146,9 @@ class MigrationProcessHolder(
         progress.isVisible = false
 
         val request = ImageRequest.Builder(view.context).data(manga)
-            .target(CoverViewTarget(coverThumbnail, progress)).build()
+            .target(CoverViewTarget(coverThumbnail, progress))
+            .setParameter(MangaCoverFetcher.useCustomCover, false)
+            .build()
         Coil.imageLoader(view.context).enqueue(request)
 
         compactTitle.isVisible = true
@@ -151,13 +160,7 @@ class MigrationProcessHolder(
         }
 
         gradient.isVisible = true
-        title.text = /*if (source.id == MERGED_SOURCE_ID) {
-            MergedSource.MangaConfig.readFromUrl(gson, manga.url).children.map {
-                sourceManager.getOrStub(it.source).toString()
-            }.distinct().joinToString()
-        } else {*/
-            source.toString()
-        // }
+        title.text = source.toString()
 
         val mangaChapters = db.getChapters(manga).executeAsBlocking()
         unreadDownloadBadge.badgeView.setChapters(mangaChapters.size)
@@ -166,12 +169,12 @@ class MigrationProcessHolder(
         if (latestChapter > 0f) {
             subtitle.text = root.context.getString(
                 R.string.latest_,
-                DecimalFormat("#.#").format(latestChapter)
+                DecimalFormat("#.#").format(latestChapter),
             )
         } else {
             subtitle.text = root.context.getString(
                 R.string.latest_,
-                root.context.getString(R.string.unknown)
+                root.context.getString(R.string.unknown),
             )
         }
     }

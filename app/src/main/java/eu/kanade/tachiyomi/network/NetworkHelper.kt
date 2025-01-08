@@ -1,15 +1,16 @@
 package eu.kanade.tachiyomi.network
 
 import android.content.Context
-import coil.util.CoilUtils
 import com.chuckerteam.chucker.api.ChuckerCollector
 import com.chuckerteam.chucker.api.ChuckerInterceptor
 import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
+import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UserAgentInterceptor
 import okhttp3.Cache
 import okhttp3.OkHttpClient
+import okhttp3.brotli.BrotliInterceptor
 import uy.kohesive.injekt.injectLazy
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -22,16 +23,23 @@ class NetworkHelper(val context: Context) {
 
     private val cacheSize = 5L * 1024 * 1024 // 5 MiB
 
-    val cookieManager = AndroidCookieJar()
+    val cookieJar = AndroidCookieJar()
+
+    private val userAgentInterceptor by lazy { UserAgentInterceptor(::defaultUserAgent) }
+    private val cloudflareInterceptor by lazy {
+        CloudflareInterceptor(context, cookieJar, ::defaultUserAgent)
+    }
 
     private val baseClientBuilder: OkHttpClient.Builder
         get() {
             val builder = OkHttpClient.Builder()
-                .cookieJar(cookieManager)
+                .cookieJar(cookieJar)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
-                .callTimeout(90, TimeUnit.SECONDS)
-                .addInterceptor(UserAgentInterceptor())
+                .callTimeout(2, TimeUnit.MINUTES)
+                .addInterceptor(BrotliInterceptor)
+                .addInterceptor(UncaughtExceptionInterceptor())
+                .addInterceptor(userAgentInterceptor)
                 .apply {
                     if (BuildConfig.DEBUG) {
                         addInterceptor(
@@ -40,7 +48,7 @@ class NetworkHelper(val context: Context) {
                                 .maxContentLength(250000L)
                                 .redactHeaders(emptySet())
                                 .alwaysReadResponseBody(false)
-                                .build()
+                                .build(),
                         )
                     }
 
@@ -57,11 +65,17 @@ class NetworkHelper(val context: Context) {
 
     val client by lazy { baseClientBuilder.cache(Cache(cacheDir, cacheSize)).build() }
 
-    val coilClient by lazy { baseClientBuilder.cache(CoilUtils.createDefaultCache(context)).build() }
-
+    @Suppress("UNUSED")
     val cloudflareClient by lazy {
         client.newBuilder()
-            .addInterceptor(CloudflareInterceptor(context))
+            .addInterceptor(cloudflareInterceptor)
             .build()
+    }
+
+    val defaultUserAgent
+        get() = preferences.defaultUserAgent().get().replace("\n", " ").trim()
+
+    companion object {
+        const val DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0"
     }
 }

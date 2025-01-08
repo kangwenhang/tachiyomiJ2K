@@ -1,7 +1,6 @@
 package eu.kanade.tachiyomi.ui.setting
 
 import android.app.Activity
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
@@ -15,7 +14,6 @@ import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.database.models.Category
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.data.preference.asImmediateFlowIn
-import eu.kanade.tachiyomi.util.system.getFilePicker
 import eu.kanade.tachiyomi.util.system.withOriginalWidth
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -48,10 +46,18 @@ class SettingsDownloadController : SettingsController() {
             defaultValue = true
         }
         switchPreference {
-            key = Keys.saveChaptersAsCBZ
+            bindTo(preferences.saveChaptersAsCBZ())
             titleRes = R.string.save_chapters_as_cbz
-            defaultValue = false
         }
+        switchPreference {
+            bindTo(preferences.splitTallImages())
+            titleRes = R.string.split_tall_images
+            summaryRes = R.string.split_tall_images_summary
+        }
+
+        val dbCategories = db.getCategories().executeAsBlocking()
+        val categories = listOf(Category.createDefault(context)) + dbCategories
+
         preferenceCategory {
             titleRes = R.string.remove_after_read
 
@@ -61,7 +67,7 @@ class SettingsDownloadController : SettingsController() {
                 defaultValue = false
             }
             intListPreference(activity) {
-                key = Keys.removeAfterReadSlots
+                bindTo(preferences.removeAfterReadSlots())
                 titleRes = R.string.remove_after_read
                 entriesRes = arrayOf(
                     R.string.never,
@@ -69,49 +75,76 @@ class SettingsDownloadController : SettingsController() {
                     R.string.second_to_last,
                     R.string.third_to_last,
                     R.string.fourth_to_last,
-                    R.string.fifth_to_last
+                    R.string.fifth_to_last,
                 )
                 entryRange = -1..4
                 defaultValue = -1
             }
+            multiSelectListPreferenceMat(activity) {
+                bindTo(preferences.removeExcludeCategories())
+                titleRes = R.string.pref_remove_exclude_categories
+                entries = categories.map { it.name }
+                entryValues = categories.map { it.id.toString() }
+                noSelectionRes = R.string.none
+                preferences.removeAfterReadSlots().asImmediateFlowIn(viewScope) { isVisible = it != -1 }
+            }
+            switchPreference {
+                bindTo(preferences.removeBookmarkedChapters())
+                titleRes = R.string.allow_deleting_bookmarked_chapters
+            }
         }
-
-        val dbCategories = db.getCategories().executeAsBlocking()
-        val categories = listOf(Category.createDefault(context)) + dbCategories
 
         preferenceCategory {
             titleRes = R.string.download_new_chapters
 
             switchPreference {
-                key = Keys.downloadNew
+                bindTo(preferences.downloadNewChapters())
                 titleRes = R.string.download_new_chapters
-                defaultValue = false
             }
             triStateListPreference(activity) {
-                key = Keys.downloadNewCategories
-                excludeKey = Keys.downloadNewCategoriesExclude
+                preferences.apply {
+                    bindTo(downloadNewChaptersInCategories(), excludeCategoriesInDownloadNew())
+                }
                 titleRes = R.string.categories
                 entries = categories.map { it.name }
                 entryValues = categories.map { it.id.toString() }
                 allSelectionRes = R.string.all
 
-                preferences.downloadNew().asImmediateFlowIn(viewScope) { isVisible = it }
+                preferences.downloadNewChapters().asImmediateFlowIn(viewScope) { isVisible = it }
             }
-            preferenceCategory {
-                titleRes = R.string.automatic_removal
+        }
 
-                intListPreference(activity) {
-                    key = Keys.deleteRemovedChapters
-                    titleRes = R.string.delete_removed_chapters
-                    summary = activity?.getString(R.string.delete_downloaded_if_removed_online)
-                    entriesRes = arrayOf(
-                        R.string.ask_on_chapters_page,
-                        R.string.always_keep,
-                        R.string.always_delete
-                    )
-                    entryRange = 0..2
-                    defaultValue = 0
-                }
+        preferenceCategory {
+            titleRes = R.string.download_ahead
+
+            intListPreference(activity) {
+                bindTo(preferences.autoDownloadWhileReading())
+                titleRes = R.string.auto_download_while_reading
+                entries = listOf(
+                    context.getString(R.string.never),
+                    context.resources.getQuantityString(R.plurals.next_unread_chapters, 2, 2),
+                    context.resources.getQuantityString(R.plurals.next_unread_chapters, 3, 3),
+                    context.resources.getQuantityString(R.plurals.next_unread_chapters, 5, 5),
+                    context.resources.getQuantityString(R.plurals.next_unread_chapters, 10, 10),
+                )
+                entryValues = listOf(0, 2, 3, 5, 10)
+            }
+            infoPreference(R.string.download_ahead_info)
+        }
+
+        preferenceCategory {
+            titleRes = R.string.automatic_removal
+
+            intListPreference(activity) {
+                bindTo(preferences.deleteRemovedChapters())
+                titleRes = R.string.delete_removed_chapters
+                summary = activity?.getString(R.string.delete_downloaded_if_removed_online)
+                entriesRes = arrayOf(
+                    R.string.ask_on_chapters_page,
+                    R.string.always_keep,
+                    R.string.always_delete,
+                )
+                entryRange = 0..2
             }
         }
     }
@@ -140,13 +173,8 @@ class SettingsDownloadController : SettingsController() {
         preferences.downloadsDirectory().set(path.toString())
     }
 
-    fun customDirectorySelected(currentDir: String) {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
-        try {
-            startActivityForResult(intent, DOWNLOAD_DIR)
-        } catch (e: ActivityNotFoundException) {
-            startActivityForResult(preferences.context.getFilePicker(currentDir), DOWNLOAD_DIR)
-        }
+    fun customDirectorySelected() {
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), DOWNLOAD_DIR)
     }
 
     class DownloadDirectoriesDialog(val controller: SettingsDownloadController) :
@@ -166,7 +194,7 @@ class SettingsDownloadController : SettingsController() {
             setTitle(R.string.download_location)
             setSingleChoiceItems(items.toTypedArray(), selectedIndex) { dialog, position ->
                 if (position == externalDirs.lastIndex) {
-                    controller.customDirectorySelected(currentDir)
+                    controller.customDirectorySelected()
                 } else {
                     controller.predefinedDirectorySelected(items[position])
                 }

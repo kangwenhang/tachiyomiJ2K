@@ -8,14 +8,18 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.webkit.WebView
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.addCallback
 import androidx.core.graphics.ColorUtils
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.util.system.WebViewClientCompat
+import eu.kanade.tachiyomi.util.system.extensionIntentForText
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.openInBrowser
 import eu.kanade.tachiyomi.util.system.toast
+import timber.log.Timber
 import uy.kohesive.injekt.injectLazy
 
 open class WebViewActivity : BaseWebViewActivity() {
@@ -23,12 +27,18 @@ open class WebViewActivity : BaseWebViewActivity() {
     private val sourceManager by injectLazy<SourceManager>()
     private var bundle: Bundle? = null
 
+    private var backPressedCallback: OnBackPressedCallback? = null
+    private val backCallback = {
+        if (binding.webview.canGoBack()) binding.webview.goBack()
+        reEnableBackPressedCallBack()
+    }
+
     companion object {
         const val SOURCE_KEY = "source_key"
         const val URL_KEY = "url_key"
         const val TITLE_KEY = "title_key"
 
-        fun newIntent(context: Context, sourceId: Long, url: String, title: String?): Intent {
+        fun newIntent(context: Context, url: String, sourceId: Long? = null, title: String? = null): Intent {
             val intent = Intent(context, WebViewActivity::class.java)
             intent.putExtra(SOURCE_KEY, sourceId)
             intent.putExtra(URL_KEY, url)
@@ -44,21 +54,41 @@ open class WebViewActivity : BaseWebViewActivity() {
 
         binding.swipeRefresh.isEnabled = false
 
+        backPressedCallback = onBackPressedDispatcher.addCallback { backCallback() }
+        binding.toolbar.setNavigationOnClickListener {
+            backPressedCallback?.isEnabled = false
+            onBackPressedDispatcher.onBackPressed()
+        }
         if (bundle == null) {
-            val source = sourceManager.get(intent.extras!!.getLong(SOURCE_KEY)) as? HttpSource ?: return
             val url = intent.extras!!.getString(URL_KEY) ?: return
-            val headers = source.headers.toMultimap().mapValues { it.value.getOrNull(0) ?: "" }
+            var headers = emptyMap<String, String>()
+            (sourceManager.get(intent.extras!!.getLong(SOURCE_KEY)) as? HttpSource)?.let { source ->
+                try {
+                    headers = source.headers.toMultimap().mapValues { it.value.getOrNull(0) ?: "" }
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to build headers")
+                }
+            }
+
+            headers["user-agent"]?.let {
+                binding.webview.settings.userAgentString = it
+            }
 
             binding.webview.webViewClient = object : WebViewClientCompat() {
                 override fun shouldOverrideUrlCompat(view: WebView, url: String): Boolean {
-                    view.loadUrl(url)
+                    // Don't attempt to open blobs as webpages
+                    if (url.startsWith("blob:http")) {
+                        return false
+                    }
+
+                    // Continue with request, but with custom headers
+                    view.loadUrl(url, headers)
                     return true
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     invalidateOptionsMenu()
-                    title = view?.title
                     binding.swipeRefresh.isEnabled = true
                     binding.swipeRefresh.isRefreshing = false
                 }
@@ -72,9 +102,19 @@ open class WebViewActivity : BaseWebViewActivity() {
                     super.onPageCommitVisible(view, url)
                     binding.webview.scrollTo(0, 0)
                 }
+
+                override fun doUpdateVisitedHistory(
+                    view: WebView?,
+                    url: String?,
+                    isReload: Boolean,
+                ) {
+                    super.doUpdateVisitedHistory(view, url, isReload)
+                    if (!isReload) {
+                        invalidateOptionsMenu()
+                    }
+                }
             }
 
-            binding.webview.settings.userAgentString = source.headers["User-Agent"]
             binding.webview.loadUrl(url, headers)
         }
     }
@@ -92,7 +132,11 @@ open class WebViewActivity : BaseWebViewActivity() {
         return true
     }
 
-    override fun onPrepareOptionsMenu(menu: Menu?): Boolean {
+    private fun reEnableBackPressedCallBack() {
+        backPressedCallback?.isEnabled = binding.webview.canGoBack()
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         val backItem = binding.toolbar.menu.findItem(R.id.action_web_back)
         val forwardItem = binding.toolbar.menu.findItem(R.id.action_web_forward)
         backItem?.isEnabled = binding.webview.canGoBack()
@@ -104,12 +148,11 @@ open class WebViewActivity : BaseWebViewActivity() {
         val translucentWhite = ColorUtils.setAlphaComponent(tintColor, 127)
         backItem.icon?.setTint(if (binding.webview.canGoBack()) tintColor else translucentWhite)
         forwardItem?.icon?.setTint(if (binding.webview.canGoForward()) tintColor else translucentWhite)
+        val extenstionCanOpenUrl = binding.webview.canGoBack() &&
+            binding.webview.url?.let { extensionIntentForText(it) != null } ?: false
+        binding.toolbar.menu.findItem(R.id.action_open_in_app)?.isVisible = extenstionCanOpenUrl
+        reEnableBackPressedCallBack()
         return super.onPrepareOptionsMenu(menu)
-    }
-
-    override fun onBackPressed() {
-        if (binding.webview.canGoBack()) binding.webview.goBack()
-        else super.onBackPressed()
     }
 
     /**
@@ -122,8 +165,14 @@ open class WebViewActivity : BaseWebViewActivity() {
             R.id.action_web_forward -> binding.webview.goForward()
             R.id.action_web_share -> shareWebpage()
             R.id.action_web_browser -> openInBrowser()
+            R.id.action_open_in_app -> openUrlInApp()
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    private fun openUrlInApp() {
+        val url = binding.webview.url ?: return
+        extensionIntentForText(url)?.let { startActivity(it) }
     }
 
     private fun shareWebpage() {
@@ -139,6 +188,6 @@ open class WebViewActivity : BaseWebViewActivity() {
     }
 
     private fun openInBrowser() {
-        binding.webview.url?.let { openInBrowser(it) }
+        binding.webview.url?.let { openInBrowser(it, forceBrowser = true, fullBrowser = true) }
     }
 }

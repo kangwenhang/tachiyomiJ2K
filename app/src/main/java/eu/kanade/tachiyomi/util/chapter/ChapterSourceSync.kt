@@ -7,6 +7,7 @@ import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.util.chapter.ChapterFilter.Companion.filterChaptersByScanlators
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.Date
@@ -25,14 +26,13 @@ fun syncChaptersWithSource(
     db: DatabaseHelper,
     rawSourceChapters: List<SChapter>,
     manga: Manga,
-    source: Source
+    source: Source,
 ): Pair<List<Chapter>, List<Chapter>> {
     if (rawSourceChapters.isEmpty()) {
         throw Exception("No chapters found")
     }
 
     val downloadManager: DownloadManager = Injekt.get()
-    val chapterFilter: ChapterFilter = Injekt.get()
     // Chapters from db.
     val dbChapters = db.getChapters(manga).executeAsBlocking()
 
@@ -41,6 +41,7 @@ fun syncChaptersWithSource(
         .mapIndexed { i, sChapter ->
             Chapter.create().apply {
                 copyFrom(sChapter)
+                name = with(ChapterSanitizer) { sChapter.name.sanitize(manga.title) }
                 manga_id = manga.id
                 source_order = i
             }
@@ -67,7 +68,7 @@ fun syncChaptersWithSource(
             ChapterRecognition.parseChapterNumber(sourceChapter, manga)
 
             if (shouldUpdateDbChapter(dbChapter, sourceChapter)) {
-                if (dbChapter.name != sourceChapter.name &&
+                if ((dbChapter.name != sourceChapter.name || dbChapter.scanlator != sourceChapter.scanlator) &&
                     downloadManager.isChapterDownloaded(dbChapter, manga)
                 ) {
                     downloadManager.renameChapter(source, manga, dbChapter, sourceChapter)
@@ -164,18 +165,22 @@ fun syncChaptersWithSource(
             if (toAdd.isNotEmpty()) {
                 manga.last_update = Date().time
             }
-        } else manga.last_update = newestChapterDate
+        } else {
+            manga.last_update = newestChapterDate
+        }
         db.updateLastUpdated(manga).executeAsBlocking()
     }
+    val reAddedSet = readded.toSet()
     return Pair(
-        chapterFilter.filterChaptersByScanlators(toAdd.subtract(readded).toList(), manga),
-        toDelete - readded
+        toAdd.subtract(reAddedSet).toList().filterChaptersByScanlators(manga),
+        toDelete - reAddedSet,
     )
 }
 
 // checks if the chapter in db needs updated
 private fun shouldUpdateDbChapter(dbChapter: Chapter, sourceChapter: Chapter): Boolean {
-    return dbChapter.scanlator != sourceChapter.scanlator || dbChapter.name != sourceChapter.name ||
+    return dbChapter.scanlator != sourceChapter.scanlator ||
+        dbChapter.name != sourceChapter.name ||
         dbChapter.date_upload != sourceChapter.date_upload ||
         dbChapter.chapter_number != sourceChapter.chapter_number ||
         dbChapter.source_order != sourceChapter.source_order

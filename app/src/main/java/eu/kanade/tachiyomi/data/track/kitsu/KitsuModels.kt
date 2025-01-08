@@ -10,12 +10,13 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class KitsuSearchManga(obj: JsonObject) {
-    val id = obj["id"]!!.jsonPrimitive.int
+    val id = obj["id"]!!.jsonPrimitive.long
     private val canonicalTitle = obj["canonicalTitle"]!!.jsonPrimitive.content
     private val chapterCount = obj["chapterCount"]?.jsonPrimitive?.intOrNull
     val subType = obj["subtype"]?.jsonPrimitive?.contentOrNull
@@ -60,7 +61,7 @@ class KitsuLibManga(obj: JsonObject, manga: JsonObject) {
     private val startDate = manga["attributes"]!!.jsonObject["startDate"]?.jsonPrimitive?.contentOrNull.orEmpty()
     private val startedAt = obj["attributes"]!!.jsonObject["startedAt"]?.jsonPrimitive?.contentOrNull
     private val finishedAt = obj["attributes"]!!.jsonObject["finishedAt"]?.jsonPrimitive?.contentOrNull
-    private val libraryId = obj["id"]!!.jsonPrimitive.int
+    private val libraryId = obj["id"]!!.jsonPrimitive.long
     val status = obj["attributes"]!!.jsonObject["status"]!!.jsonPrimitive.content
     private val ratingTwenty = obj["attributes"]!!.jsonObject["ratingTwenty"]?.jsonPrimitive?.contentOrNull
     val progress = obj["attributes"]!!.jsonObject["progress"]!!.jsonPrimitive.int
@@ -79,7 +80,7 @@ class KitsuLibManga(obj: JsonObject, manga: JsonObject) {
         finished_reading_date = KitsuDateHelper.parse(finishedAt)
         status = toTrackStatus()
         score = ratingTwenty?.let { it.toInt() / 2f } ?: 0f
-        last_chapter_read = progress
+        last_chapter_read = progress.toFloat()
     }
 
     private fun toTrackStatus() = when (status) {

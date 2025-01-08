@@ -18,7 +18,7 @@ import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.extension.util.ExtensionInstallBroadcast.Companion.EXTRA_SESSION_ID
 import eu.kanade.tachiyomi.extension.util.ExtensionInstallBroadcast.Companion.PACKAGE_INSTALLED_ACTION
 import eu.kanade.tachiyomi.extension.util.ExtensionInstallBroadcast.Companion.packageInstallStep
-import eu.kanade.tachiyomi.util.system.MiuiUtil
+import eu.kanade.tachiyomi.util.system.DeviceUtil
 import eu.kanade.tachiyomi.util.system.toast
 import uy.kohesive.injekt.injectLazy
 
@@ -38,7 +38,7 @@ class ExtensionInstallBroadcast : BroadcastReceiver() {
             val data = UniFile.fromUri(context, intent.data).openInputStream()
 
             val params = SessionParams(
-                SessionParams.MODE_FULL_INSTALL
+                SessionParams.MODE_FULL_INSTALL,
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 params.setRequireUserAction(USER_ACTION_NOT_REQUIRED)
@@ -101,7 +101,7 @@ class ExtensionInstallBroadcast : BroadcastReceiver() {
                     PackageInstaller.STATUS_FAILURE, PackageInstaller.STATUS_FAILURE_ABORTED, PackageInstaller.STATUS_FAILURE_BLOCKED, PackageInstaller.STATUS_FAILURE_CONFLICT, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE, PackageInstaller.STATUS_FAILURE_INVALID, PackageInstaller.STATUS_FAILURE_STORAGE -> {
                         extensionManager.setInstallationResult(downloadId, false)
                         if (status != PackageInstaller.STATUS_FAILURE_ABORTED) {
-                            if (MiuiUtil.isMiui()) {
+                            if (DeviceUtil.isMiui) {
                                 context.toast(R.string.extensions_miui_warning, Toast.LENGTH_LONG)
                             } else {
                                 context.toast(R.string.could_not_install_extension)
@@ -137,7 +137,7 @@ class ExtensionInstallActivity : Activity() {
             val data = UniFile.fromUri(this, intent.data).openInputStream()
 
             val params = SessionParams(
-                SessionParams.MODE_FULL_INSTALL
+                SessionParams.MODE_FULL_INSTALL,
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 params.setRequireUserAction(USER_ACTION_NOT_REQUIRED)

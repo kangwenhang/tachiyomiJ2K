@@ -18,6 +18,8 @@ fun Long.timeSpanFromNow(context: Context): String {
     }
 }
 
+fun Context.timeSpanFromNow(res: Int, time: Long) = getString(res, time.timeSpanFromNow(this))
+
 /**
  * Convert local time millisecond value to Calendar instance in UTC
  *
@@ -38,7 +40,7 @@ fun Long.toUtcCalendar(): Calendar? {
             rawCalendar.get(Calendar.DAY_OF_MONTH),
             rawCalendar.get(Calendar.HOUR_OF_DAY),
             rawCalendar.get(Calendar.MINUTE),
-            rawCalendar.get(Calendar.SECOND)
+            rawCalendar.get(Calendar.SECOND),
         )
     }
 }
@@ -63,7 +65,7 @@ fun Long.toLocalCalendar(): Calendar? {
             rawCalendar.get(Calendar.DAY_OF_MONTH),
             rawCalendar.get(Calendar.HOUR_OF_DAY),
             rawCalendar.get(Calendar.MINUTE),
-            rawCalendar.get(Calendar.SECOND)
+            rawCalendar.get(Calendar.SECOND),
         )
     }
 }

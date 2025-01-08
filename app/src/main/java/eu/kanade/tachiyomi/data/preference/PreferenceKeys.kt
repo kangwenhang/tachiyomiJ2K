@@ -5,8 +5,6 @@ package eu.kanade.tachiyomi.data.preference
  */
 object PreferenceKeys {
 
-    const val theme = "pref_theme_key"
-
     const val nightMode = "night_mode"
     const val lightTheme = "light_theme"
     const val darkTheme = "dark_theme"
@@ -56,8 +54,6 @@ object PreferenceKeys {
 
     const val cropBordersWebtoon = "crop_borders_webtoon"
 
-    const val readWithTapping = "reader_tap"
-
     const val readWithLongTap = "reader_long_tap"
 
     const val readWithVolumeKeys = "reader_volume_keys"
@@ -93,9 +89,9 @@ object PreferenceKeys {
 
     const val webtoonEnableZoomOut = "webtoon_enable_zoom_out"
 
-    const val updateOnlyNonCompleted = "pref_update_only_non_completed_key"
-
     const val autoUpdateTrack = "pref_auto_update_manga_sync_key"
+
+    const val trackMarkedAsRead = "track_marked_as_read"
 
     const val trackingsToAddOnline = "pref_tracking_for_online"
 
@@ -115,8 +111,6 @@ object PreferenceKeys {
 
     const val downloadOnlyOverWifi = "pref_download_only_over_wifi_key"
 
-    const val folderPerManga = "create_folder_per_manga"
-
     const val showLibrarySearchSuggestions = "show_library_search_suggestions"
 
     const val librarySearchSuggestion = "library_search_suggestion"
@@ -133,13 +127,6 @@ object PreferenceKeys {
 
     const val libraryUpdateInterval = "pref_library_update_interval_key"
 
-    const val libraryUpdateRestriction = "library_update_restriction"
-
-    const val libraryUpdateCategories = "library_update_categories"
-    const val libraryUpdateCategoriesExclude = "library_update_categories_exclude"
-
-    const val libraryUpdatePrioritization = "library_update_prioritization"
-
     const val filterDownloaded = "pref_filter_downloaded_key"
 
     const val filterUnread = "pref_filter_unread_key"
@@ -152,8 +139,6 @@ object PreferenceKeys {
 
     const val showEmptyCategoriesFiltering = "show_empty_categories_filtering"
 
-    const val librarySortingMode = "library_sorting_mode"
-
     const val automaticExtUpdates = "automatic_ext_updates"
 
     const val installedExtensionsOrder = "installed_extensions_order"
@@ -165,9 +150,6 @@ object PreferenceKeys {
     const val onlySearchPinned = "only_search_pinned"
 
     const val downloadNew = "download_new"
-
-    const val downloadNewCategories = "download_new_categories"
-    const val downloadNewCategoriesExclude = "download_new_categories_exclude"
 
     const val libraryLayout = "pref_display_library_layout"
 
@@ -195,8 +177,6 @@ object PreferenceKeys {
 
     const val lastUnlock = "last_unlock"
 
-    const val secureScreen = "secure_screen"
-
     const val hideNotificationContent = "hide_notification_content"
 
     const val removeArticles = "remove_articles"
@@ -205,17 +185,12 @@ object PreferenceKeys {
 
     const val refreshCoversToo = "refresh_covers_too"
 
-    const val updateOnRefresh = "update_on_refresh"
-
     const val showDLsInRecents = "show_dls_in_recents"
     const val showRemHistoryInRecents = "show_rem_history_in_recents"
     const val showReadInAllRecents = "show_read_in_all_recents"
     const val showTitleFirstInRecents = "show_title_first_in_recents"
 
-    const val groupChaptersHistory = "group_chapters_history"
-
     const val showUpdatedTime = "show_updated_time"
-    const val groupChaptersUpdates = "group_chapters_updates"
 
     const val categoryNumberOfItems = "display_number_of_items"
 
@@ -255,15 +230,11 @@ object PreferenceKeys {
 
     const val defaultChapterSortByAscendingOrDescending = "default_chapter_sort_by_ascending_or_descending"
 
+    const val coverRatios = "cover_ratio"
+
+    const val coverColors = "cover_colors"
+
     const val hideChapterTitles = "hide_chapter_titles"
 
     const val chaptersDescAsDefault = "chapters_desc_as_default"
-
-    const val saveChaptersAsCBZ = "save_chapter_as_cbz"
-
-    fun trackUsername(syncId: Int) = "pref_mangasync_username_$syncId"
-
-    fun trackPassword(syncId: Int) = "pref_mangasync_password_$syncId"
-
-    fun trackToken(syncId: Int) = "track_token_$syncId"
 }

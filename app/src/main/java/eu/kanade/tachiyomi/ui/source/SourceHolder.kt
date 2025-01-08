@@ -30,23 +30,29 @@ class SourceHolder(view: View, val adapter: SourceAdapter) :
         // setCardEdges(item)
 
         val underPinnedSection = item.header?.code?.equals(SourcePresenter.PINNED_KEY) ?: false
+        val underLastUsedSection = item.header?.code?.equals(SourcePresenter.LAST_USED_KEY) ?: false
         val isPinned = item.isPinned ?: underPinnedSection
-        // Set source name
-        val sourceName =
-            if (adapter.isMultiLanguage && underPinnedSection) source.toString() else source.name
+        val showLanguage = source.includeLangInName(adapter.enabledLanguages, adapter.extensionManager)
+        val sourceName = if (showLanguage && (underPinnedSection || underLastUsedSection)) source.toString() else source.name
         binding.title.text = sourceName
 
         binding.sourcePin.apply {
             imageTintList = ColorStateList.valueOf(
                 context.getResourceColor(
-                    if (isPinned) R.attr.colorSecondary
-                    else android.R.attr.textColorSecondary
-                )
+                    if (isPinned) {
+                        R.attr.colorSecondary
+                    } else {
+                        android.R.attr.textColorSecondary
+                    },
+                ),
             )
             compatToolTipText = context.getString(if (isPinned) R.string.unpin else R.string.pin)
             setImageResource(
-                if (isPinned) R.drawable.ic_pin_24dp
-                else R.drawable.ic_pin_outline_24dp
+                if (isPinned) {
+                    R.drawable.ic_pin_24dp
+                } else {
+                    R.drawable.ic_pin_outline_24dp
+                },
             )
         }
 

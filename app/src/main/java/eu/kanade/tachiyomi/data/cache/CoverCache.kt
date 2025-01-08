@@ -69,7 +69,7 @@ class CoverCache(val context: Context) {
     suspend fun deleteOldCovers() {
         val db = Injekt.get<DatabaseHelper>()
         var deletedSize = 0L
-        val urls = db.getLibraryMangas().executeOnIO().mapNotNull {
+        val urls = db.getFavoriteMangas().executeOnIO().mapNotNull {
             it.thumbnail_url?.let { url -> return@mapNotNull DiskUtil.hashKeyForDisk(url) }
             null
         }
@@ -85,8 +85,8 @@ class CoverCache(val context: Context) {
             context.toast(
                 context.getString(
                     R.string.deleted_,
-                    Formatter.formatFileSize(context, deletedSize)
-                )
+                    Formatter.formatFileSize(context, deletedSize),
+                ),
             )
         }
     }
@@ -108,11 +108,11 @@ class CoverCache(val context: Context) {
             context.toast(
                 context.getString(
                     R.string.deleted_,
-                    Formatter.formatFileSize(context, deletedSize)
-                )
+                    Formatter.formatFileSize(context, deletedSize),
+                ),
             )
         }
-        context.imageLoader.memoryCache.clear()
+        context.imageLoader.memoryCache?.clear()
 
         lastClean = System.currentTimeMillis()
     }
@@ -169,7 +169,7 @@ class CoverCache(val context: Context) {
     fun setCustomCoverToCache(manga: Manga, inputStream: InputStream) {
         getCustomCoverFile(manga).outputStream().use {
             inputStream.copyTo(it)
-            context.imageLoader.memoryCache.remove(MemoryCache.Key(manga.key()))
+            context.imageLoader.memoryCache?.remove(MemoryCache.Key(manga.key()))
         }
     }
 
@@ -183,7 +183,7 @@ class CoverCache(val context: Context) {
         val result = getCustomCoverFile(manga).let {
             it.exists() && it.delete()
         }
-        context.imageLoader.memoryCache.remove(MemoryCache.Key(manga.key()))
+        context.imageLoader.memoryCache?.remove(MemoryCache.Key(manga.key()))
         return result
     }
 
@@ -205,7 +205,7 @@ class CoverCache(val context: Context) {
     fun deleteFromCache(name: String?) {
         if (name.isNullOrEmpty()) return
         val file = getCoverFile(MangaImpl().apply { thumbnail_url = name })
-        context.imageLoader.memoryCache.remove(MemoryCache.Key(file.name))
+        context.imageLoader.memoryCache?.remove(MemoryCache.Key(file.name))
         if (file.exists()) file.delete()
     }
 
@@ -217,7 +217,7 @@ class CoverCache(val context: Context) {
      */
     fun deleteFromCache(
         manga: Manga,
-        deleteCustom: Boolean = true
+        deleteCustom: Boolean = true,
     ) {
         // Check if url is empty.
         if (manga.thumbnail_url.isNullOrEmpty()) return
@@ -226,7 +226,7 @@ class CoverCache(val context: Context) {
         val file = getCoverFile(manga)
         if (deleteCustom) deleteCustomCover(manga)
         if (file.exists()) {
-            context.imageLoader.memoryCache.remove(MemoryCache.Key(manga.key()))
+            context.imageLoader.memoryCache?.remove(MemoryCache.Key(manga.key()))
             file.delete()
         }
     }

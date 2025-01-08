@@ -5,6 +5,7 @@ import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.ui.reader.settings.PageLayout
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerConfig
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation
+import eu.kanade.tachiyomi.ui.reader.viewer.navigation.DisabledNavigation
 import eu.kanade.tachiyomi.ui.reader.viewer.navigation.EdgeNavigation
 import eu.kanade.tachiyomi.ui.reader.viewer.navigation.KindlishNavigation
 import eu.kanade.tachiyomi.ui.reader.viewer.navigation.LNavigation
@@ -22,7 +23,7 @@ import uy.kohesive.injekt.api.get
 class PagerConfig(
     scope: CoroutineScope,
     private val viewer: PagerViewer,
-    preferences: PreferencesHelper = Injekt.get()
+    preferences: PreferencesHelper = Injekt.get(),
 ) :
     ViewerConfig(preferences, scope) {
 
@@ -36,6 +37,12 @@ class PagerConfig(
         private set
 
     var imageCropBorders = false
+        private set
+
+    var navigateToPan = false
+        private set
+
+    var landscapeZoom = false
         private set
 
     var readerTheme = 0
@@ -56,6 +63,8 @@ class PagerConfig(
                 shiftDoublePage = false
             }
         }
+
+    var hingeGapSize = 0
 
     var invertDoublePages = false
 
@@ -80,7 +89,7 @@ class PagerConfig(
                 { tappingInverted = it },
                 {
                     navigator.invertMode = it
-                }
+                },
             )
 
         preferences.pagerNavInverted().asFlow()
@@ -98,6 +107,12 @@ class PagerConfig(
 
         preferences.cropBorders()
             .register({ imageCropBorders = it }, { imagePropertyChangedListener?.invoke() })
+
+        preferences.navigateToPan()
+            .register({ navigateToPan = it })
+
+        preferences.landscapeZoom()
+            .register({ landscapeZoom = it }, { imagePropertyChangedListener?.invoke() })
 
         preferences.readerTheme()
             .register({ readerTheme = it }, { imagePropertyChangedListener?.invoke() })
@@ -124,7 +139,7 @@ class PagerConfig(
                     doublePages = it == PageLayout.DOUBLE_PAGES.value
                     splitPages = it == PageLayout.SPLIT_PAGES.value
                 }
-            })
+            },)
 
         preferences.automaticSplitsPage()
             .register({ autoSplitPages = it })
@@ -167,7 +182,8 @@ class PagerConfig(
         return when (imageScaleType) {
             SubsamplingScaleImageView.SCALE_TYPE_FIT_HEIGHT,
             SubsamplingScaleImageView.SCALE_TYPE_SMART_FIT,
-            SubsamplingScaleImageView.SCALE_TYPE_CENTER_CROP -> true
+            SubsamplingScaleImageView.SCALE_TYPE_CENTER_CROP,
+            -> true
             else -> false
         }
     }
@@ -179,6 +195,7 @@ class PagerConfig(
             2 -> KindlishNavigation()
             3 -> EdgeNavigation()
             4 -> RightAndLeftNavigation()
+            5 -> DisabledNavigation()
             else -> defaultNavigation()
         }
         navigationModeChangedListener?.invoke()

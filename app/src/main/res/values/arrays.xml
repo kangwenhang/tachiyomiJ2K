@@ -10,13 +10,6 @@
         <item>@string/continuous_vertical</item>
     </string-array>
 
-    <string-array name="reader_themes">
-        <item>@string/white</item>
-        <item>@string/black</item>
-        <item>@string/smart_by_page</item>
-        <item>@string/smart_by_theme</item>
-    </string-array>
-
     <string-array name="hopper_long_press">
         <item>@string/search</item>
         <item>@string/expand_collapse_all_categories</item>
@@ -60,6 +53,7 @@
 
     <string-array name="webtoon_side_padding">
         <item>@string/webtoon_side_padding_0</item>
+        <item>@string/webtoon_side_padding_5</item>
         <item>@string/webtoon_side_padding_10</item>
         <item>@string/webtoon_side_padding_15</item>
         <item>@string/webtoon_side_padding_20</item>
@@ -68,6 +62,7 @@
 
     <string-array name="webtoon_side_padding_values">
         <item>0</item>
+        <item>5</item>
         <item>10</item>
         <item>15</item>
         <item>20</item>
@@ -104,12 +99,20 @@
         <item>@string/always</item>
     </string-array>
 
+    <string-array name="group_chapters_together">
+        <item>@string/by_series</item>
+        <item>@string/by_week</item>
+        <item>@string/by_day</item>
+        <item>@string/never</item>
+    </string-array>
+
     <string-array name="reader_nav">
         <item>@string/default_value</item>
         <item>@string/l_nav</item>
         <item>@string/kindlish_nav</item>
         <item>@string/edge_nav</item>
         <item>@string/right_and_left_nav</item>
+        <item>@string/disabled</item>
     </string-array>
 
     <string-array name="page_layouts">
@@ -134,6 +137,11 @@
     <string-array name="cutout_behavior">
         <item>@string/pad_cutout_areas</item>
         <item>@string/start_past_cutout</item>
+        <item>@string/ignore_cutout_areas</item>
+    </string-array>
+
+    <string-array name="cutout_behavior_landscape">
+        <item>@string/pad_cutout_areas</item>
         <item>@string/ignore_cutout_areas</item>
     </string-array>
 

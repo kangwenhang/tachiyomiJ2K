@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Application
 import android.app.PendingIntent
@@ -7,43 +8,40 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.Build
 import android.webkit.WebView
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.multidex.MultiDex
+import eu.kanade.tachiyomi.appwidget.TachiyomiWidgetManager
 import eu.kanade.tachiyomi.data.image.coil.CoilSetup
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.data.preference.asImmediateFlow
+import eu.kanade.tachiyomi.ui.library.LibraryPresenter
+import eu.kanade.tachiyomi.ui.recents.RecentsPresenter
 import eu.kanade.tachiyomi.ui.security.SecureActivityDelegate
+import eu.kanade.tachiyomi.ui.source.SourcePresenter
+import eu.kanade.tachiyomi.util.manga.MangaCoverMetadata
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil
+import eu.kanade.tachiyomi.util.system.launchIO
+import eu.kanade.tachiyomi.util.system.localeContext
 import eu.kanade.tachiyomi.util.system.notification
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import org.acra.ACRA
-import org.acra.config.httpSender
-import org.acra.data.StringFormat
-import org.acra.ktx.initAcra
 import org.conscrypt.Conscrypt
 import timber.log.Timber
 import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.InjektScope
 import uy.kohesive.injekt.injectLazy
-import uy.kohesive.injekt.registry.default.DefaultRegistrar
 import java.security.Security
 
-// @ReportsCrashes(
-//    formUri = "https://collector.tracepot.com/e90773ff",
-//    reportType = org.acra.sender.HttpSender.Type.JSON,
-//    httpMethod = org.acra.sender.HttpSender.Method.PUT,
-//    buildConfigClass = BuildConfig::class,
-//    excludeMatchingSharedPreferencesKeys = [".*username.*", ".*password.*", ".*token.*"]
-// )
 open class App : Application(), DefaultLifecycleObserver {
 
     val preferences: PreferencesHelper by injectLazy()
@@ -66,18 +64,21 @@ open class App : Application(), DefaultLifecycleObserver {
             if (packageName != process) WebView.setDataDirectorySuffix(process)
         }
 
-        Injekt = InjektScope(DefaultRegistrar())
         Injekt.importModule(AppModule(this))
 
         CoilSetup(this)
-        setupAcra()
         setupNotificationChannels()
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
+        MangaCoverMetadata.load()
         preferences.nightMode()
             .asImmediateFlow { AppCompatDelegate.setDefaultNightMode(it) }
             .launchIn(ProcessLifecycleOwner.get().lifecycleScope)
+
+        ProcessLifecycleOwner.get().lifecycleScope.launchIO {
+            with(TachiyomiWidgetManager()) { this@App.init() }
+        }
 
         // Show notification to disable Incognito Mode when it's enabled
         preferences.incognitoMode().asFlow()
@@ -85,10 +86,11 @@ open class App : Application(), DefaultLifecycleObserver {
                 val notificationManager = NotificationManagerCompat.from(this)
                 if (enabled) {
                     disableIncognitoReceiver.register()
-                    val notification = notification(Notifications.CHANNEL_INCOGNITO_MODE) {
-                        val incogText = getString(R.string.incognito_mode)
+                    val nContext = localeContext
+                    val notification = nContext.notification(Notifications.CHANNEL_INCOGNITO_MODE) {
+                        val incogText = nContext.getString(R.string.incognito_mode)
                         setContentTitle(incogText)
-                        setContentText(getString(R.string.turn_off_, incogText))
+                        setContentText(nContext.getString(R.string.turn_off_, incogText))
                         setSmallIcon(R.drawable.ic_incognito_24dp)
                         setOngoing(true)
 
@@ -96,9 +98,16 @@ open class App : Application(), DefaultLifecycleObserver {
                             this@App,
                             0,
                             Intent(ACTION_DISABLE_INCOGNITO_MODE),
-                            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+                            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
                         )
                         setContentIntent(pendingIntent)
+                    }
+                    if (ActivityCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.POST_NOTIFICATIONS,
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        return@onEach
                     }
                     notificationManager.notify(Notifications.ID_INCOGNITO_MODE, notification)
                 } else {
@@ -120,17 +129,11 @@ open class App : Application(), DefaultLifecycleObserver {
         MultiDex.install(this)
     }
 
-    protected open fun setupAcra() {
-        initAcra {
-            reportFormat = StringFormat.JSON
-            buildConfigClass = BuildConfig::class.java
-            excludeMatchingSharedPreferencesKeys = arrayOf(".*username.*", ".*password.*", ".*token.*")
-            httpSender {
-                uri = "https://collector.tracepot.com/e90773ff"
-                httpMethod = org.acra.sender.HttpSender.Method.PUT
-            }
-        }
-        ACRA.init(this)
+    override fun onLowMemory() {
+        super.onLowMemory()
+        LibraryPresenter.onLowMemory()
+        RecentsPresenter.onLowMemory()
+        SourcePresenter.onLowMemory()
     }
 
     protected open fun setupNotificationChannels() {
@@ -146,7 +149,12 @@ open class App : Application(), DefaultLifecycleObserver {
 
         fun register() {
             if (!registered) {
-                registerReceiver(this, IntentFilter(ACTION_DISABLE_INCOGNITO_MODE))
+                ContextCompat.registerReceiver(
+                    this@App,
+                    this,
+                    IntentFilter(ACTION_DISABLE_INCOGNITO_MODE),
+                    ContextCompat.RECEIVER_EXPORTED,
+                )
                 registered = true
             }
         }

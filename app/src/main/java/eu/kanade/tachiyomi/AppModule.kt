@@ -2,15 +2,19 @@ package eu.kanade.tachiyomi
 
 import android.app.Application
 import androidx.core.content.ContextCompat
-import com.google.gson.Gson
 import eu.kanade.tachiyomi.data.cache.ChapterCache
 import eu.kanade.tachiyomi.data.cache.CoverCache
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.library.CustomMangaManager
+import eu.kanade.tachiyomi.data.preference.AndroidPreferenceStore
+import eu.kanade.tachiyomi.data.preference.PreferenceStore
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.data.track.TrackManager
+import eu.kanade.tachiyomi.data.track.TrackPreferences
 import eu.kanade.tachiyomi.extension.ExtensionManager
+import eu.kanade.tachiyomi.extension.util.TrustExtension
+import eu.kanade.tachiyomi.network.JavaScriptEngine
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.util.chapter.ChapterFilter
@@ -27,7 +31,13 @@ class AppModule(val app: Application) : InjektModule {
     override fun InjektRegistrar.registerInjectables() {
         addSingleton(app)
 
+        addSingletonFactory<PreferenceStore> {
+            AndroidPreferenceStore(app)
+        }
+
         addSingletonFactory { PreferencesHelper(app) }
+
+        addSingletonFactory { TrackPreferences(get()) }
 
         addSingletonFactory { DatabaseHelper(app) }
 
@@ -37,8 +47,9 @@ class AppModule(val app: Application) : InjektModule {
 
         addSingletonFactory { NetworkHelper(app) }
 
-        addSingletonFactory { SourceManager(app).also { get<ExtensionManager>().init(it) } }
+        addSingletonFactory { JavaScriptEngine(app) }
 
+        addSingletonFactory { SourceManager(app, get()) }
         addSingletonFactory { ExtensionManager(app) }
 
         addSingletonFactory { DownloadManager(app) }
@@ -47,13 +58,18 @@ class AppModule(val app: Application) : InjektModule {
 
         addSingletonFactory { TrackManager(app) }
 
-        addSingletonFactory { Gson() }
-
-        addSingletonFactory { Json { ignoreUnknownKeys = true } }
+        addSingletonFactory {
+            Json {
+                ignoreUnknownKeys = true
+                explicitNulls = false
+            }
+        }
 
         addSingletonFactory { ChapterFilter() }
 
         addSingletonFactory { MangaShortcutManager() }
+
+        addSingletonFactory { TrustExtension(get()) }
 
         // Asynchronously init expensive components for a faster cold start
 

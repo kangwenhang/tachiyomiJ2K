@@ -4,15 +4,21 @@ import android.app.Activity
 import android.content.res.Configuration
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.CheckBox
 import android.widget.CompoundButton
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.content.ContextCompat
+import androidx.core.view.children
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import com.bluelinelabs.conductor.Controller
-import com.tfcporciuncula.flow.Preference
+import com.fredporciuncula.flow.preferences.Preference
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.MigrationBottomSheetBinding
@@ -26,7 +32,7 @@ import uy.kohesive.injekt.injectLazy
 
 class MigrationBottomSheetDialog(
     activity: Activity,
-    private val listener: StartMigrationListener
+    private val listener: StartMigrationListener,
 ) : E2EBottomSheetDialog<MigrationBottomSheetBinding>(activity) {
 
     /**
@@ -59,10 +65,18 @@ class MigrationBottomSheetDialog(
             binding.extraSearchParam.layoutParams = params3
         }
         setBottomEdge(
-            if (activity.resources.configuration?.orientation == Configuration.ORIENTATION_LANDSCAPE) binding.extraSearchParamText
-            else binding.skipStep,
-            activity
+            if (activity.resources.configuration?.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                binding.extraSearchParamText
+            } else {
+                binding.skipStep
+            },
+            activity,
         )
+        val contentView = binding.root
+        (contentView.parent as View).background = ContextCompat.getDrawable(context, R.drawable.bg_sheet_gradient)
+        contentView.post {
+            (contentView.parent as View).background = ContextCompat.getDrawable(context, R.drawable.bg_sheet_gradient)
+        }
     }
 
     /**
@@ -80,7 +94,7 @@ class MigrationBottomSheetDialog(
             listener.startMigration(
                 binding.extraSearchParamText.text?.toString()?.takeIf {
                     it.isNotBlank() && binding.extraSearchParam.isChecked
-                }
+                },
             )
             dismiss()
         }
@@ -92,38 +106,40 @@ class MigrationBottomSheetDialog(
     private fun initPreferences() {
         val flags = preferences.migrateFlags().get()
 
-        binding.migChapters.isChecked = MigrationFlags.hasChapters(flags)
-        binding.migCategories.isChecked = MigrationFlags.hasCategories(flags)
-        binding.migTracking.isChecked = MigrationFlags.hasTracks(flags)
-
-        binding.migChapters.setOnCheckedChangeListener { _, _ -> setFlags() }
-        binding.migCategories.setOnCheckedChangeListener { _, _ -> setFlags() }
-        binding.migTracking.setOnCheckedChangeListener { _, _ -> setFlags() }
+        val enabledFlags = MigrationFlags.getEnabledFlags(flags)
+        MigrationFlags.titles.forEachIndexed { index, title ->
+            val checkbox = CheckBox(context)
+            checkbox.id = title.hashCode()
+            checkbox.text = context.getString(title)
+            checkbox.isChecked = enabledFlags[index]
+            binding.gridFlagsLayout.addView(checkbox)
+            checkbox.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                marginStart = 8.dpToPx
+                topMargin = 8.dpToPx
+            }
+            checkbox.setOnCheckedChangeListener { _, _ -> setFlags() }
+        }
 
         binding.extraSearchParamText.isVisible = false
         binding.extraSearchParam.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                binding.extraSearchParamText.isVisible = true
-            } else {
-                binding.extraSearchParamText.isVisible = false
-            }
+            binding.extraSearchParamText.isVisible = isChecked
         }
         binding.sourceGroup.bindToPreference(preferences.useSourceWithMost())
 
         binding.skipStep.isChecked = preferences.skipPreMigration().get()
         binding.skipStep.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) (listener as? Controller)?.activity?.toast(
-                R.string.to_show_again_setting_sources,
-                Toast.LENGTH_LONG
-            )
+            if (isChecked) {
+                (listener as? Controller)?.activity?.toast(
+                    R.string.to_show_again_setting_sources,
+                    Toast.LENGTH_LONG,
+                )
+            }
         }
     }
 
     private fun setFlags() {
-        var flags = 0
-        if (binding.migChapters.isChecked) flags = flags or MigrationFlags.CHAPTERS
-        if (binding.migCategories.isChecked) flags = flags or MigrationFlags.CATEGORIES
-        if (binding.migTracking.isChecked) flags = flags or MigrationFlags.TRACK
+        val enabledBoxes = binding.gridFlagsLayout.children.toList().filterIsInstance<CheckBox>().map { it.isChecked }
+        val flags = MigrationFlags.getFlagsFromPositions(enabledBoxes.toTypedArray())
         preferences.migrateFlags().set(flags)
     }
 

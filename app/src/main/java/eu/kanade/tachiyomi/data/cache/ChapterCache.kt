@@ -97,7 +97,7 @@ class ChapterCache(private val context: Context) {
             PARAMETER_APP_VERSION,
             PARAMETER_VALUE_COUNT,
             // 4 pages = 115MB, 6 = ~150MB, 10 = ~200MB, 20 = ~300MB
-            (PARAMETER_CACHE_SIZE * cacheSize.toFloat().pow(0.6f)).roundToLong()
+            (PARAMETER_CACHE_SIZE * cacheSize.toFloat().pow(0.6f)).roundToLong(),
         )
     }
 
@@ -181,7 +181,7 @@ class ChapterCache(private val context: Context) {
      */
     fun isImageInCache(imageUrl: String): Boolean {
         return try {
-            diskCache.get(DiskUtil.hashKeyForDisk(imageUrl)) != null
+            diskCache.get(DiskUtil.hashKeyForDisk(imageUrl)).use { it != null }
         } catch (e: IOException) {
             false
         }
@@ -217,12 +217,12 @@ class ChapterCache(private val context: Context) {
             editor = diskCache.edit(key) ?: throw IOException("Unable to edit key")
 
             // Get OutputStream and write image with Okio.
-            response.body!!.source().saveTo(editor.newOutputStream(0))
+            response.body.source().saveTo(editor.newOutputStream(0))
 
             diskCache.flush()
             editor.commit()
         } finally {
-            response.body?.close()
+            response.body.close()
             editor?.abortUnlessCommitted()
         }
     }

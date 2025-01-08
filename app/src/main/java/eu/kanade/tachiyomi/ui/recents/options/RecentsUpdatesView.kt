@@ -12,6 +12,9 @@ class RecentsUpdatesView @JvmOverloads constructor(context: Context, attrs: Attr
     override fun inflateBinding() = RecentsUpdatesViewBinding.bind(this)
     override fun initGeneralPreferences() {
         binding.showUpdatedTime.bindToPreference(preferences.showUpdatedTime())
-        binding.groupChapters.bindToPreference(preferences.groupChaptersUpdates())
+        binding.sortFetchedTime.bindToPreference(preferences.sortFetchedTime())
+        binding.groupChapters.bindToPreference(preferences.collapseGroupedUpdates()) {
+            controller?.presenter?.expandedSectionsMap?.clear()
+        }
     }
 }

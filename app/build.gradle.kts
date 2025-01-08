@@ -1,7 +1,4 @@
 import java.io.ByteArrayOutputStream
-import java.time.LocalDateTime
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 plugins {
     id(Plugins.androidApplication)
@@ -10,13 +7,13 @@ plugins {
     id(Plugins.kotlinParcelize)
     id(Plugins.kotlinSerialization)
     id("com.google.android.gms.oss-licenses-plugin")
-    id(Plugins.firebaseCrashlytics)
     id(Plugins.googleServices) apply false
+    id("com.google.firebase.crashlytics")
 }
 
-fun getBuildTime() = DateTimeFormatter.ISO_DATE_TIME.format(LocalDateTime.now(ZoneOffset.UTC))
-fun getCommitCount() = runCommand("git rev-list --count HEAD")
-fun getGitSha() = runCommand("git rev-parse --short HEAD")
+if (gradle.startParameter.taskRequests.toString().contains("Standard")) {
+    apply<com.google.gms.googleservices.GoogleServicesPlugin>()
+}
 
 fun runCommand(command: String): String {
     val byteOut = ByteArrayOutputStream()
@@ -27,8 +24,11 @@ fun runCommand(command: String): String {
     return String(byteOut.toByteArray()).trim()
 }
 
+val supportedAbis = setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+
 android {
     compileSdk = AndroidVersions.compileSdk
+    ndkVersion = AndroidVersions.ndk
 
     defaultConfig {
         minSdk = AndroidVersions.minSdk
@@ -40,25 +40,57 @@ android {
         multiDexEnabled = true
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getCommitCount()}\"")
+        buildConfigField("String", "BETA_COUNT", "\"${getBetaCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getGitSha()}\"")
         buildConfigField("String", "BUILD_TIME", "\"${getBuildTime()}\"")
         buildConfigField("Boolean", "INCLUDE_UPDATER", "false")
+        buildConfigField("boolean", "BETA", "false")
 
         ndk {
-            abiFilters += setOf("armeabi-v7a", "arm64-v8a", "x86")
+            abiFilters += supportedAbis
+        }
+        externalNativeBuild {
+            cmake {
+                this.arguments("-DHAVE_LIBJXL=FALSE")
+            }
         }
     }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include(*supportedAbis.toTypedArray())
+            isUniversalApk = true
+        }
+    }
+
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".debugJ2K"
+            versionNameSuffix = "-d${getCommitCount()}"
         }
         getByName("release") {
             applicationIdSuffix = ".j2k"
+            isShrinkResources = true
+            isMinifyEnabled = true
+            proguardFiles("proguard-android-optimize.txt", "proguard-rules.pro")
+        }
+        create("beta") {
+            initWith(getByName("release"))
+            buildConfigField("boolean", "BETA", "true")
+            versionNameSuffix = "-b${getBetaCount()}"
         }
     }
 
     buildFeatures {
         viewBinding = true
+        compose = true
+
+        // Disable some unused things
+        aidl = false
+        renderScript = false
+        shaders = false
     }
 
     flavorDimensions.add("default")
@@ -79,46 +111,71 @@ android {
         checkReleaseBuilds = false
     }
 
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.3"
+    }
+
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
+    namespace = "eu.kanade.tachiyomi"
 }
 
 dependencies {
+    // Compose
+    implementation("androidx.activity:activity-compose:1.7.2")
+    implementation("androidx.compose.foundation:foundation:1.5.1")
+    implementation("androidx.compose.animation:animation:1.5.1")
+    implementation("androidx.compose.ui:ui:1.5.1")
+    implementation("androidx.compose.material:material:1.5.1")
+    implementation("androidx.compose.material3:material3:1.1.2")
+    implementation("com.google.android.material:compose-theme-adapter-3:1.1.1")
+    implementation("androidx.compose.material:material-icons-extended:1.5.1")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.5.1")
+    debugImplementation("androidx.compose.ui:ui-tooling:1.5.1")
+    implementation("com.google.accompanist:accompanist-webview:0.30.1")
+    implementation("androidx.glance:glance-appwidget:1.0.0")
+
     // Modified dependencies
-    implementation("com.github.jays2kings:subsampling-scale-image-view:dfd3e43") {
+    implementation("com.github.jays2kings:subsampling-scale-image-view:756849e") {
         exclude(module = "image-decoder")
     }
-    implementation("com.github.tachiyomiorg:image-decoder:0e91111")
-
-    // Source models and interfaces from Tachiyomi 1.x
-    implementation("tachiyomi.sourceapi:source-api:1.1")
+    implementation("com.github.tachiyomiorg:image-decoder:7879b45")
 
     // Android X libraries
-    implementation("androidx.appcompat:appcompat:1.4.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.cardview:cardview:1.0.0")
-    implementation("com.google.android.material:material:1.5.0")
-    implementation("androidx.webkit:webkit:1.4.0")
-    implementation("androidx.recyclerview:recyclerview:1.2.1")
-    implementation("androidx.preference:preference:1.1.1")
-    implementation("androidx.annotation:annotation:1.3.0")
-    implementation("androidx.browser:browser:1.4.0")
+    implementation("com.google.android.material:material:1.10.0")
+    implementation("androidx.webkit:webkit:1.8.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.1")
+    implementation("androidx.preference:preference:1.2.1")
+    implementation("androidx.annotation:annotation:1.7.0")
+    implementation("androidx.browser:browser:1.6.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.palette:palette:1.0.0")
-    implementation("androidx.core:core-ktx:1.7.0")
+    implementation("androidx.activity:activity-ktx:1.8.0")
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("com.google.android.flexbox:flexbox:3.0.0")
+    implementation("androidx.window:window:1.1.0")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
-    implementation("androidx.constraintlayout:constraintlayout:2.1.2")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
     implementation("androidx.multidex:multidex:2.0.1")
 
-    implementation("com.google.firebase:firebase-core:19.0.1")
+    implementation(platform("com.google.firebase:firebase-bom:31.2.3"))
 
-    val lifecycleVersion = "2.4.0-rc01"
-    kapt("androidx.lifecycle:lifecycle-compiler:$lifecycleVersion")
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-crashlytics-ktx")
+
+    val lifecycleVersion = "2.6.2"
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-common:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-process:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
 
@@ -126,71 +183,65 @@ dependencies {
     implementation("io.reactivex:rxandroid:1.2.1")
     implementation("io.reactivex:rxjava:1.3.8")
     implementation("com.jakewharton.rxrelay:rxrelay:1.2.0")
-    implementation("com.github.pwittchen:reactivenetwork:0.13.0")
 
     // Coroutines
-    implementation("com.github.tfcporciuncula:flow-preferences:1.3.4")
+    implementation("com.fredporciuncula:flow-preferences:1.6.0")
 
     // Network client
-    implementation("com.squareup.okhttp3:okhttp:${Versions.okhttp}")
-    implementation("com.squareup.okhttp3:logging-interceptor:${Versions.okhttp}")
-    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:${Versions.okhttp}")
-    implementation("com.squareup.okio:okio:2.10.0")
+    val okhttpVersion = "5.0.0-alpha.11"
+    implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
+    implementation("com.squareup.okhttp3:logging-interceptor:$okhttpVersion")
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:$okhttpVersion")
+    implementation("com.squareup.okhttp3:okhttp-brotli:$okhttpVersion")
+    implementation("com.squareup.okio:okio:3.4.0")
 
     // Chucker
     val chuckerVersion = "3.5.2"
     debugImplementation("com.github.ChuckerTeam.Chucker:library:$chuckerVersion")
     releaseImplementation("com.github.ChuckerTeam.Chucker:library-no-op:$chuckerVersion")
+    add("betaImplementation", "com.github.ChuckerTeam.Chucker:library-no-op:$chuckerVersion")
 
-    // REST
-    implementation("com.squareup.retrofit2:retrofit:${Versions.RETROFIT}")
-    implementation("com.squareup.retrofit2:converter-gson:${Versions.RETROFIT}")
-
-    implementation(kotlin("reflect", version = Versions.kotlin))
+    implementation(kotlin("reflect", version = AndroidVersions.kotlin))
 
     // JSON
-    val kotlinSerialization =  "1.3.0"
+    val kotlinSerialization =  "1.6.0"
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${kotlinSerialization}")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:${kotlinSerialization}")
-    implementation("com.google.code.gson:gson:2.8.7")
-    implementation("com.github.salomonbrys.kotson:kotson:2.5.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json-okio:${kotlinSerialization}")
 
     // JavaScript engine
     implementation("app.cash.quickjs:quickjs-android:0.9.2")
-    // TODO: remove Duktape once all extensions are using QuickJS
-    implementation("com.squareup.duktape:duktape-android:1.4.0")
 
     // Disk
     implementation("com.jakewharton:disklrucache:2.0.2")
     implementation("com.github.tachiyomiorg:unifile:17bec43")
-    implementation("com.github.junrar:junrar:7.4.0")
+    implementation("com.github.junrar:junrar:7.5.5")
 
     // HTML parser
-    implementation("org.jsoup:jsoup:1.14.3")
+    implementation("org.jsoup:jsoup:1.16.1")
 
     // Job scheduling
-    implementation("androidx.work:work-runtime-ktx:2.6.0")
+    implementation("androidx.work:work-runtime-ktx:2.8.1")
+    implementation("com.google.guava:guava:31.1-android")
 
     implementation("com.google.android.gms:play-services-gcm:17.0.0")
 
-    // Changelog
-    implementation("com.github.gabrielemariotti.changeloglib:changelog:2.1.0")
-
     // Database
-    implementation("androidx.sqlite:sqlite-ktx:2.2.0")
-    implementation("com.github.requery:sqlite-android:3.36.0")
+    implementation("androidx.sqlite:sqlite-ktx:2.3.1")
+    implementation("com.github.requery:sqlite-android:3.39.2")
     implementation("com.github.inorichi.storio:storio-common:8be19de@aar")
     implementation("com.github.inorichi.storio:storio-sqlite:8be19de@aar")
 
     // Model View Presenter
-    implementation("info.android15.nucleus:nucleus:${Versions.NUCLEUS}")
-    implementation("info.android15.nucleus:nucleus-support-v7:${Versions.NUCLEUS}")
+    val nucleusVersion = "3.0.0"
+    implementation("info.android15.nucleus:nucleus:$nucleusVersion")
+    implementation("info.android15.nucleus:nucleus-support-v7:$nucleusVersion")
 
     // Dependency injection
     implementation("com.github.inorichi.injekt:injekt-core:65b0440")
 
     // Image library
-    val coilVersion = "1.3.2"
+    val coilVersion = "2.4.0"
     implementation("io.coil-kt:coil:$coilVersion")
     implementation("io.coil-kt:coil-gif:$coilVersion")
     implementation("io.coil-kt:coil-svg:$coilVersion")
@@ -204,76 +255,85 @@ dependencies {
     // UI
     implementation("com.dmitrymalkovich.android:material-design-dimens:1.4")
     implementation("br.com.simplepass:loading-button-android:2.2.0")
-    implementation("com.mikepenz:fastadapter:${Versions.fastAdapter}")
-    implementation("com.mikepenz:fastadapter-extensions-binding:${Versions.fastAdapter}")
-    implementation("eu.davidea:flexible-adapter:5.1.0")
-    implementation("eu.davidea:flexible-adapter-ui:1.0.0")
-    implementation("com.nononsenseapps:filepicker:2.5.2")
+    val fastAdapterVersion = "5.6.0"
+    implementation("com.mikepenz:fastadapter:$fastAdapterVersion")
+    implementation("com.mikepenz:fastadapter-extensions-binding:$fastAdapterVersion")
+    implementation("com.github.arkon.FlexibleAdapter:flexible-adapter:c8013533")
+    implementation("com.github.arkon.FlexibleAdapter:flexible-adapter-ui:c8013533")
     implementation("com.nightlynexus.viewstatepageradapter:viewstatepageradapter:1.1.0")
     implementation("com.github.mthli:Slice:v1.2")
+    implementation("io.noties.markwon:core:4.6.2")
 
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
     implementation("com.github.tachiyomiorg:DirectionalViewPager:1.0.0")
     implementation("com.github.florent37:viewtooltip:1.2.2")
-    implementation("com.getkeepsafe.taptargetview:taptargetview:1.13.0")
+    implementation("com.getkeepsafe.taptargetview:taptargetview:1.13.3")
 
     // Conductor
-    val conductorVersion = "3.0.0"
+    val conductorVersion = "4.0.0-preview-3"
     implementation("com.bluelinelabs:conductor:$conductorVersion")
-    implementation("com.github.tachiyomiorg:conductor-support-preference:$conductorVersion")
-
-    // RxBindings
-    implementation("com.jakewharton.rxbinding:rxbinding-kotlin:${Versions.RX_BINDING}")
-    implementation("com.jakewharton.rxbinding:rxbinding-appcompat-v7-kotlin:${Versions.RX_BINDING}")
-    implementation("com.jakewharton.rxbinding:rxbinding-support-v4-kotlin:${Versions.RX_BINDING}")
-    implementation("com.jakewharton.rxbinding:rxbinding-recyclerview-v7-kotlin:${Versions.RX_BINDING}")
+    implementation("com.github.tachiyomiorg:conductor-support-preference:3.0.0")
 
     // Shizuku
     val shizukuVersion = "12.1.0"
     implementation("dev.rikka.shizuku:api:$shizukuVersion")
     implementation("dev.rikka.shizuku:provider:$shizukuVersion")
 
-    // Tests
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.assertj:assertj-core:3.16.1")
-    testImplementation("org.mockito:mockito-core:1.10.19")
-
-    testImplementation("org.robolectric:robolectric:${Versions.ROBO_ELECTRIC}")
-    testImplementation("org.robolectric:shadows-multidex:${Versions.ROBO_ELECTRIC}")
-    testImplementation("org.robolectric:shadows-play-services:${Versions.ROBO_ELECTRIC}")
-
     implementation(kotlin("stdlib", org.jetbrains.kotlin.config.KotlinCompilerVersion.VERSION))
 
-    val coroutines = "1.5.1"
+    val coroutines = "1.7.3"
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutines")
 
-    // Crash reports
-    implementation("ch.acra:acra-http:5.8.1")
-
     // Text distance
-    implementation("info.debatty:java-string-similarity:1.2.1")
+    implementation("info.debatty:java-string-similarity:2.0.0")
 
-    implementation("com.google.android.gms:play-services-oss-licenses:${Versions.OSS_LICENSE}")
+    implementation("com.google.android.gms:play-services-oss-licenses:17.0.1")
 
     // TLS 1.3 support for Android < 10
     implementation("org.conscrypt:conscrypt-android:2.5.2")
+
+    // Android Chart
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 }
-
-
 
 tasks {
     // See https://kotlinlang.org/docs/reference/experimental.html#experimental-status-of-experimental-api(-markers)
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         kotlinOptions.freeCompilerArgs += listOf(
-            "-Xopt-in=kotlin.Experimental",
-            "-Xopt-in=kotlin.RequiresOptIn",
-            "-Xuse-experimental=kotlin.ExperimentalStdlibApi",
-            "-Xuse-experimental=kotlinx.coroutines.FlowPreview",
-            "-Xuse-experimental=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-Xuse-experimental=kotlinx.coroutines.InternalCoroutinesApi",
-            "-Xuse-experimental=kotlinx.serialization.ExperimentalSerializationApi"
+            "-Xcontext-receivers",
+            "-opt-in=kotlin.Experimental",
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlin.ExperimentalStdlibApi",
+            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
+            "-opt-in=androidx.compose.material.ExperimentalMaterialApi",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.material.ExperimentalMaterialApi",
+            "-opt-in=androidx.compose.ui.ExperimentalComposeUiApi",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
+            "-opt-in=androidx.compose.animation.graphics.ExperimentalAnimationGraphicsApi",
+            "-opt-in=coil.annotation.ExperimentalCoilApi",
+            "-opt-in=com.google.accompanist.permissions.ExperimentalPermissionsApi",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=kotlinx.coroutines.FlowPreview",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=kotlinx.coroutines.InternalCoroutinesApi",
+            "-opt-in=kotlinx.serialization.ExperimentalSerializationApi",
         )
+
+        if (project.findProperty("tachiyomi.enableComposeCompilerMetrics") == "true") {
+            kotlinOptions.freeCompilerArgs += listOf(
+                "-P",
+                "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=" +
+                        project.buildDir.absolutePath + "/compose_metrics",
+            )
+            kotlinOptions.freeCompilerArgs += listOf(
+                "-P",
+                "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=" +
+                        project.buildDir.absolutePath + "/compose_metrics",
+            )
+        }
     }
 
     // Duplicating Hebrew string assets due to some locale code issues on different devices
@@ -286,8 +346,4 @@ tasks {
     preBuild {
         dependsOn(formatKotlin, copyHebrewStrings)
     }
-}
-
-if (gradle.startParameter.taskRequests.toString().contains("Standard")) {
-    apply(mapOf("plugin" to "com.google.gms.google-services"))
 }

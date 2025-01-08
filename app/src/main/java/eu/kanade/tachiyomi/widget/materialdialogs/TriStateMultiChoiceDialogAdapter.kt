@@ -17,7 +17,7 @@ internal typealias TriStateMultiChoiceListener = (
     indices: IntArray,
     items: List<CharSequence>,
     selectedIndex: Int,
-    selectedState: Int
+    selectedState: Int,
 ) -> Unit
 
 internal class TriStateMultiChoiceDialogAdapter(
@@ -29,7 +29,7 @@ internal class TriStateMultiChoiceDialogAdapter(
     internal var listener: TriStateMultiChoiceListener?,
 ) : RecyclerView.Adapter<TriStateMultiChoiceViewHolder>() {
 
-    private val states = TriStateCheckBox.State.values()
+    private val states = TriStateCheckBox.State.entries
     private val defaultOrdinal
         get() = if (skipChecked) {
             TriStateCheckBox.State.IGNORE.ordinal
@@ -78,13 +78,13 @@ internal class TriStateMultiChoiceDialogAdapter(
 
     override fun onCreateViewHolder(
         parent: ViewGroup,
-        viewType: Int
+        viewType: Int,
     ): TriStateMultiChoiceViewHolder {
         val listItemView: View = ListitemTristatechoiceBinding
             .inflate(LayoutInflater.from(dialog.context), parent, false).root
         return TriStateMultiChoiceViewHolder(
             itemView = listItemView,
-            adapter = this
+            adapter = this,
         )
     }
 
@@ -92,7 +92,7 @@ internal class TriStateMultiChoiceDialogAdapter(
 
     override fun onBindViewHolder(
         holder: TriStateMultiChoiceViewHolder,
-        position: Int
+        position: Int,
     ) {
         holder.isEnabled = !disabledIndices.contains(position)
 
@@ -108,7 +108,7 @@ internal class TriStateMultiChoiceDialogAdapter(
     override fun onBindViewHolder(
         holder: TriStateMultiChoiceViewHolder,
         position: Int,
-        payloads: MutableList<Any>
+        payloads: MutableList<Any>,
     ) {
         when (payloads.firstOrNull()) {
             CheckPayload -> {

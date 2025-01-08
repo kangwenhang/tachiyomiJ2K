@@ -11,6 +11,7 @@ import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.WebtoonLayoutManager
+import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.reader.model.ChapterTransition
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
@@ -19,8 +20,8 @@ import eu.kanade.tachiyomi.ui.reader.viewer.BaseViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
-import rx.subscriptions.CompositeSubscription
 import timber.log.Timber
+import uy.kohesive.injekt.injectLazy
 import kotlin.math.max
 import kotlin.math.min
 
@@ -28,6 +29,8 @@ import kotlin.math.min
  * Implementation of a [BaseViewer] to display pages with a [RecyclerView].
  */
 class WebtoonViewer(val activity: ReaderActivity, val hasMargins: Boolean = false) : BaseViewer {
+
+    val downloadManager: DownloadManager by injectLazy()
 
     private val scope = MainScope()
 
@@ -66,11 +69,6 @@ class WebtoonViewer(val activity: ReaderActivity, val hasMargins: Boolean = fals
      */
     val config = WebtoonConfig(scope)
 
-    /**
-     * Subscriptions to keep while this viewer is used.
-     */
-    val subscriptions = CompositeSubscription()
-
     init {
         recycler.setBackgroundColor(Color.BLACK)
         recycler.isVisible = false // Don't let the recycler layout yet
@@ -83,6 +81,10 @@ class WebtoonViewer(val activity: ReaderActivity, val hasMargins: Boolean = fals
                 override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                     onScrolled()
 
+                    if (dy > config.menuThreshold || dy < -config.menuThreshold) {
+                        activity.hideMenu()
+                    }
+
                     if (dy < 0) {
                         val firstIndex = layoutManager.findFirstVisibleItemPosition()
                         val firstItem = adapter.items.getOrNull(firstIndex)
@@ -90,24 +92,22 @@ class WebtoonViewer(val activity: ReaderActivity, val hasMargins: Boolean = fals
                             activity.requestPreloadChapter(firstItem.to)
                         }
                     }
+
+                    val lastIndex = layoutManager.findLastEndVisibleItemPosition()
+                    val lastItem = adapter.items.getOrNull(lastIndex)
+                    if (lastItem is ChapterTransition.Next && lastItem.to == null) {
+                        activity.showMenu()
+                    }
                 }
-            }
+            },
         )
         recycler.tapListener = f@{ event ->
-            if (!config.tappingEnabled) {
-                activity.toggleMenu()
-                return@f
-            }
-
             val pos = PointF(event.rawX / recycler.width, event.rawY / recycler.height)
-            if (!config.tappingEnabled) activity.toggleMenu()
-            else {
-                val navigator = config.navigator
-                when (navigator.getAction(pos)) {
-                    ViewerNavigation.NavigationRegion.MENU -> activity.toggleMenu()
-                    ViewerNavigation.NavigationRegion.NEXT, ViewerNavigation.NavigationRegion.RIGHT -> moveToNext()
-                    ViewerNavigation.NavigationRegion.PREV, ViewerNavigation.NavigationRegion.LEFT -> moveToPrevious()
-                }
+            val navigator = config.navigator
+            when (navigator.getAction(pos)) {
+                ViewerNavigation.NavigationRegion.MENU -> activity.toggleMenu()
+                ViewerNavigation.NavigationRegion.NEXT, ViewerNavigation.NavigationRegion.RIGHT -> moveToNext()
+                ViewerNavigation.NavigationRegion.PREV, ViewerNavigation.NavigationRegion.LEFT -> moveToPrevious()
             }
         }
         recycler.longTapListener = f@{ event ->
@@ -176,7 +176,6 @@ class WebtoonViewer(val activity: ReaderActivity, val hasMargins: Boolean = fals
     override fun destroy() {
         super.destroy()
         scope.cancel()
-        subscriptions.unsubscribe()
     }
 
     /**
@@ -211,9 +210,6 @@ class WebtoonViewer(val activity: ReaderActivity, val hasMargins: Boolean = fals
         if (toChapter != null) {
             Timber.d("Request preload destination chapter because we're on the transition")
             activity.requestPreloadChapter(toChapter)
-        } else if (transition is ChapterTransition.Next) {
-            // No more chapters, show menu because the user is probably going to close the reader
-            activity.showMenu()
         }
     }
 
@@ -302,11 +298,13 @@ class WebtoonViewer(val activity: ReaderActivity, val hasMargins: Boolean = fals
 
             KeyEvent.KEYCODE_DPAD_RIGHT,
             KeyEvent.KEYCODE_DPAD_UP,
-            KeyEvent.KEYCODE_PAGE_UP -> if (isUp) moveToPrevious()
+            KeyEvent.KEYCODE_PAGE_UP,
+            -> if (isUp) moveToPrevious()
 
             KeyEvent.KEYCODE_DPAD_LEFT,
             KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_PAGE_DOWN -> if (isUp) moveToNext()
+            KeyEvent.KEYCODE_PAGE_DOWN,
+            -> if (isUp) moveToNext()
             else -> return false
         }
         return true
@@ -328,7 +326,7 @@ class WebtoonViewer(val activity: ReaderActivity, val hasMargins: Boolean = fals
         val position = layoutManager.findLastEndVisibleItemPosition()
         adapter.notifyItemRangeChanged(
             max(0, position - 3),
-            min(position + 3, adapter.itemCount - 1)
+            min(position + 3, adapter.itemCount - 1),
         )
     }
 }

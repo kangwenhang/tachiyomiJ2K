@@ -9,7 +9,7 @@ import androidx.core.text.color
 import androidx.core.text.scale
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
-import coil.clear
+import coil.dispose
 import coil.load
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.image.coil.CoverViewTarget
@@ -17,12 +17,12 @@ import eu.kanade.tachiyomi.databinding.ExtensionCardItemBinding
 import eu.kanade.tachiyomi.extension.model.Extension
 import eu.kanade.tachiyomi.extension.model.InstallStep
 import eu.kanade.tachiyomi.extension.model.InstalledExtensionsOrder
+import eu.kanade.tachiyomi.extension.util.ExtensionLoader
 import eu.kanade.tachiyomi.ui.base.holder.BaseFlexibleViewHolder
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.timeSpanFromNow
 import eu.kanade.tachiyomi.util.view.resetStrokeColor
-import uy.kohesive.injekt.api.get
 import java.util.Locale
 
 class ExtensionHolder(view: View, val adapter: ExtensionAdapter) :
@@ -48,24 +48,28 @@ class ExtensionHolder(view: View, val adapter: ExtensionAdapter) :
         if (extension is Extension.Installed && !extension.hasUpdate) {
             when (InstalledExtensionsOrder.fromValue(adapter.installedSortOrder)) {
                 InstalledExtensionsOrder.RecentlyUpdated -> {
-                    extensionUpdateDate(extension.pkgName)?.let {
-                        binding.date.isVisible = true
-                        binding.date.text = itemView.context.getString(
-                            R.string.updated_,
-                            it.timeSpanFromNow
-                        )
-                        infoText.add("")
-                    }
+                    ExtensionLoader.extensionUpdateDate(itemView.context, extension)
+                        .takeUnless { it == 0L }?.let {
+                            binding.date.isVisible = true
+                            binding.date.text = itemView.context.timeSpanFromNow(R.string.updated_, it)
+                            infoText.add("")
+                        }
                 }
                 InstalledExtensionsOrder.RecentlyInstalled -> {
-                    extensionInstallDate(extension.pkgName)?.let {
-                        binding.date.isVisible = true
-                        binding.date.text = itemView.context.getString(
-                            R.string.installed_,
-                            it.timeSpanFromNow
-                        )
-                        infoText.add("")
-                    }
+                    ExtensionLoader.extensionInstallDate(itemView.context, extension)
+                        .takeUnless { it == 0L }?.let {
+                            binding.date.isVisible = true
+                            binding.date.text =
+                                itemView.context.timeSpanFromNow(
+                                    if (extension.isShared) {
+                                        R.string.installed_
+                                    } else {
+                                        R.string.added_
+                                    },
+                                    it,
+                                )
+                            infoText.add("")
+                        }
                 }
                 else -> binding.date.isVisible = false
             }
@@ -89,9 +93,6 @@ class ExtensionHolder(view: View, val adapter: ExtensionAdapter) :
         binding.version.text = infoText.joinToString(" • ")
         binding.lang.text = LocaleHelper.getDisplayName(extension.lang)
         binding.warning.text = when {
-            extension is Extension.Untrusted -> itemView.context.getString(R.string.untrusted)
-            extension is Extension.Installed && extension.isObsolete -> itemView.context.getString(R.string.obsolete)
-            extension is Extension.Installed && extension.isUnofficial -> itemView.context.getString(R.string.unofficial)
             extension.isNsfw -> itemView.context.getString(R.string.nsfw_short)
             else -> ""
         }.uppercase(Locale.ROOT)
@@ -99,14 +100,14 @@ class ExtensionHolder(view: View, val adapter: ExtensionAdapter) :
         binding.installProgress.isVisible = item.sessionProgress != null
         binding.cancelButton.isVisible = item.sessionProgress != null
 
-        binding.sourceImage.clear()
+        binding.sourceImage.dispose()
 
         if (extension is Extension.Available) {
             binding.sourceImage.load(extension.iconUrl) {
                 target(CoverViewTarget(binding.sourceImage))
             }
-        } else {
-            extension.getApplicationIcon(itemView.context)?.let { binding.sourceImage.setImageDrawable(it) }
+        } else if (extension is Extension.Installed) {
+            binding.sourceImage.load(extension.icon)
         }
         bindButton(item)
     }
@@ -136,7 +137,7 @@ class ExtensionHolder(view: View, val adapter: ExtensionAdapter) :
                     InstallStep.Installed -> R.string.installed
                     InstallStep.Error -> R.string.retry
                     else -> return@with
-                }
+                },
             )
             if (installStep != InstallStep.Error) {
                 isEnabled = false
@@ -159,25 +160,7 @@ class ExtensionHolder(view: View, val adapter: ExtensionAdapter) :
             setText(R.string.trust)
         } else {
             resetStrokeColor()
-            setText(R.string.install)
-        }
-    }
-
-    private fun extensionInstallDate(pkgName: String): Long? {
-        val context = itemView.context
-        return try {
-            context.packageManager.getPackageInfo(pkgName, 0).firstInstallTime
-        } catch (e: java.lang.Exception) {
-            null
-        }
-    }
-
-    private fun extensionUpdateDate(pkgName: String): Long? {
-        val context = itemView.context
-        return try {
-            context.packageManager.getPackageInfo(pkgName, 0).lastUpdateTime
-        } catch (e: java.lang.Exception) {
-            null
+            setText(if (adapter.installPrivately) R.string.add else R.string.install)
         }
     }
 }

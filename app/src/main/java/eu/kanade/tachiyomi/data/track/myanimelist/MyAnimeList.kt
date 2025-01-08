@@ -27,7 +27,9 @@ class MyAnimeList(private val context: Context, id: Int) : TrackService(id) {
 
     override fun getLogo() = R.drawable.ic_tracker_mal
 
-    override fun getLogoColor() = Color.rgb(46, 81, 162)
+    override fun getTrackerColor() = getLogoColor()
+
+    override fun getLogoColor() = Color.rgb(46, 82, 162)
 
     override fun getStatus(status: Int): String = with(context) {
         when (status) {
@@ -58,6 +60,8 @@ class MyAnimeList(private val context: Context, id: Int) : TrackService(id) {
     override fun isCompletedStatus(index: Int) = getStatusList()[index] == COMPLETED
 
     override fun completedStatus(): Int = COMPLETED
+    override fun readingStatus() = READING
+    override fun planningStatus() = PLAN_TO_READ
 
     override fun getScoreList(): List<String> {
         return IntRange(0, 10).map(Int::toString)
@@ -70,14 +74,12 @@ class MyAnimeList(private val context: Context, id: Int) : TrackService(id) {
     override suspend fun add(track: Track): Track {
         track.status = READING
         track.score = 0F
-        updateNewTrackInfo(track, PLAN_TO_READ)
+        updateNewTrackInfo(track)
         return api.updateItem(track)
     }
 
-    override suspend fun update(track: Track, setToReadStatus: Boolean): Track {
-        if (setToReadStatus && track.status == PLAN_TO_READ && track.last_chapter_read != 0) {
-            track.status = READING
-        }
+    override suspend fun update(track: Track, setToRead: Boolean): Track {
+        updateTrackStatus(track, setToRead)
         return api.updateItem(track)
     }
 
@@ -136,17 +138,17 @@ class MyAnimeList(private val context: Context, id: Int) : TrackService(id) {
 
     override fun logout() {
         super.logout()
-        preferences.trackToken(this).delete()
+        trackPreferences.trackToken(this).delete()
         interceptor.setAuth(null)
     }
 
     fun saveOAuth(oAuth: OAuth?) {
-        preferences.trackToken(this).set(json.encodeToString(oAuth))
+        trackPreferences.trackToken(this).set(json.encodeToString(oAuth))
     }
 
     fun loadOAuth(): OAuth? {
         return try {
-            json.decodeFromString<OAuth>(preferences.trackToken(this).get())
+            json.decodeFromString<OAuth>(trackPreferences.trackToken(this).get())
         } catch (e: Exception) {
             null
         }

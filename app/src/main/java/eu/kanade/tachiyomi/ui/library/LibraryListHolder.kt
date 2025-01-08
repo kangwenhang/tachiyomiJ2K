@@ -4,7 +4,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
-import coil.clear
+import coil.dispose
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.image.coil.loadManga
 import eu.kanade.tachiyomi.databinding.MangaListItemBinding
@@ -23,7 +23,7 @@ import eu.kanade.tachiyomi.util.view.setCards
 
 class LibraryListHolder(
     private val view: View,
-    adapter: LibraryCategoryAdapter
+    adapter: LibraryCategoryAdapter,
 ) : LibraryHolder(view, adapter) {
 
     private val binding = MangaListItemBinding.bind(view)
@@ -48,8 +48,11 @@ class LibraryListHolder(
                 binding.title.isVisible = false
             } else {
                 binding.title.text = itemView.context.getString(
-                    if (adapter.hasActiveFilters) R.string.no_matches_for_filters_short
-                    else R.string.category_is_empty
+                    if (adapter.hasActiveFilters) {
+                        R.string.no_matches_for_filters_short
+                    } else {
+                        R.string.category_is_empty
+                    },
                 )
             }
             binding.title.textAlignment = View.TEXT_ALIGNMENT_CENTER
@@ -76,7 +79,7 @@ class LibraryListHolder(
             } else {
                 listOfNotNull(
                     item.manga.author?.trim()?.takeIf { it.isNotBlank() },
-                    item.manga.artist?.trim()?.takeIf { it.isNotBlank() }
+                    item.manga.artist?.trim()?.takeIf { it.isNotBlank() },
                 ).joinToString(", ")
             }
 
@@ -90,7 +93,7 @@ class LibraryListHolder(
         }
 
         // Update the cover.
-        binding.coverThumbnail.clear()
+        binding.coverThumbnail.dispose()
         binding.coverThumbnail.loadManga(item.manga)
     }
 

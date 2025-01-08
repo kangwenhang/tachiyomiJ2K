@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.ui.source.browse
 
-import android.os.Bundle
 import eu.davidea.flexibleadapter.items.IFlexible
 import eu.kanade.tachiyomi.data.cache.CoverCache
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
@@ -13,7 +12,7 @@ import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.SManga
-import eu.kanade.tachiyomi.ui.base.presenter.BasePresenter
+import eu.kanade.tachiyomi.ui.base.presenter.BaseCoroutinePresenter
 import eu.kanade.tachiyomi.ui.source.filter.CheckboxItem
 import eu.kanade.tachiyomi.ui.source.filter.CheckboxSectionItem
 import eu.kanade.tachiyomi.ui.source.filter.GroupItem
@@ -28,17 +27,14 @@ import eu.kanade.tachiyomi.ui.source.filter.TextSectionItem
 import eu.kanade.tachiyomi.ui.source.filter.TriStateItem
 import eu.kanade.tachiyomi.ui.source.filter.TriStateSectionItem
 import eu.kanade.tachiyomi.util.system.launchIO
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import eu.kanade.tachiyomi.util.system.withUIContext
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import rx.Observable
-import rx.Subscription
-import rx.android.schedulers.AndroidSchedulers
-import rx.schedulers.Schedulers
-import rx.subjects.PublishSubject
 import timber.log.Timber
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -47,26 +43,28 @@ import uy.kohesive.injekt.api.get
  * Presenter of [BrowseSourceController].
  */
 open class BrowseSourcePresenter(
-    sourceId: Long,
+    private val sourceId: Long,
     searchQuery: String? = null,
-    sourceManager: SourceManager = Injekt.get(),
+    var useLatest: Boolean = false,
+    val sourceManager: SourceManager = Injekt.get(),
     val db: DatabaseHelper = Injekt.get(),
-    private val prefs: PreferencesHelper = Injekt.get(),
-    private val coverCache: CoverCache = Injekt.get()
-) : BasePresenter<BrowseSourceController>() {
+    val prefs: PreferencesHelper = Injekt.get(),
+    private val coverCache: CoverCache = Injekt.get(),
+) : BaseCoroutinePresenter<BrowseSourceController>() {
 
     /**
      * Selected source.
      */
-    val source = sourceManager.get(sourceId) as CatalogueSource
+    lateinit var source: CatalogueSource
 
-    /**
-     * Query from the view.
-     */
-    var query = ""
-        private set
+    val sourceIsInitialized
+        get() = this::source.isInitialized
 
     var filtersChanged = false
+
+    var items = mutableListOf<BrowseSourceItem>()
+    val page: Int
+        get() = pager.currentPage
 
     /**
      * Modifiable list of filters.
@@ -89,63 +87,57 @@ open class BrowseSourcePresenter(
      * Pager containing a list of manga results.
      */
     private lateinit var pager: Pager
-
-    /**
-     * Subject that initializes a list of manga.
-     */
-    private val mangaDetailSubject = PublishSubject.create<List<Manga>>()
-
-    /**
-     * Whether the view is in list mode or not.
-     */
-    var isListMode: Boolean = false
-        private set
-
-    /**
-     * Subscription for the pager.
-     */
-    private var pagerSubscription: Subscription? = null
+    private var pagerJob: Job? = null
 
     /**
      * Subscription for one request from the pager.
      */
-    private var pageSubscription: Subscription? = null
+    private var nextPageJob: Job? = null
 
-    /**
-     * Subscription to initialize manga details.
-     */
-    private var initializerSubscription: Subscription? = null
+    var query = searchQuery ?: ""
 
-    private var scope = CoroutineScope(Job() + Dispatchers.IO)
+    private val oldFilters = mutableListOf<Any?>()
 
-    init {
-        query = searchQuery ?: ""
-    }
+    override fun onCreate() {
+        super.onCreate()
+        if (!::pager.isInitialized) {
+            source = sourceManager.get(sourceId) as? CatalogueSource ?: return
 
-    override fun onCreate(savedState: Bundle?) {
-        super.onCreate(savedState)
+            sourceFilters = source.getFilterList()
 
-        sourceFilters = source.getFilterList()
-
-        if (savedState != null) {
-            query = savedState.getString(::query.name, "")
+            if (oldFilters.isEmpty()) {
+                for (i in sourceFilters) {
+                    if (i is Filter.Group<*>) {
+                        val subFilters = mutableListOf<Any?>()
+                        for (j in i.state) {
+                            subFilters.add((j as Filter<*>).state)
+                        }
+                        oldFilters.add(subFilters)
+                    } else {
+                        oldFilters.add(i.state)
+                    }
+                }
+            }
+            filtersChanged = false
+            restartPager()
         }
-
-        prefs.browseAsList().asFlow()
-            .onEach { setDisplayMode(it) }
-            .launchIn(scope)
-
-        restartPager()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        scope.cancel()
-    }
-
-    override fun onSave(state: Bundle) {
-        state.putString(::query.name, query)
-        super.onSave(state)
+    fun filtersMatchDefault(): Boolean {
+        for (i in sourceFilters.indices) {
+            val filter = oldFilters.getOrNull(i)
+            if (filter is List<*>) {
+                for (j in filter.indices) {
+                    val state = ((sourceFilters[i] as Filter.Group<*>).state[j] as Filter<*>).state
+                    if (filter[j] != state) {
+                        return false
+                    }
+                }
+            } else if (filter != sourceFilters[i].state) {
+                return false
+            }
+        }
+        return true
     }
 
     /**
@@ -158,33 +150,43 @@ open class BrowseSourcePresenter(
         this.query = query
         this.appliedFilters = filters
 
-        subscribeToMangaInitializer()
-
         // Create a new pager.
-        pager = createPager(query, filters)
+        pager = createPager(
+            query,
+            filters.takeIf { it.isNotEmpty() || query.isBlank() }
+                ?: source.getFilterList(),
+        )
 
         val sourceId = source.id
 
         val browseAsList = prefs.browseAsList()
         val sourceListType = prefs.libraryLayout()
         val outlineCovers = prefs.outlineOnCovers()
+        items.clear()
 
         // Prepare the pager.
-        pagerSubscription?.let { remove(it) }
-        pagerSubscription = pager.results()
-            .observeOn(Schedulers.io())
-            .map { it.first to it.second.map { networkToLocalManga(it, sourceId) } }
-            .doOnNext { initializeMangas(it.second) }
-            .map { it.first to it.second.map { BrowseSourceItem(it, browseAsList, sourceListType, outlineCovers) } }
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeReplay(
-                { view, (page, mangas) ->
-                    view.onAddPage(page, mangas)
-                },
-                { _, error ->
+        pagerJob?.cancel()
+        pagerJob = presenterScope.launchIO {
+            pager.results().onEach { (page, second) ->
+                try {
+                    val mangas = second
+                        .map { networkToLocalManga(it, sourceId) }
+                        .filter { !prefs.hideInLibraryItems().get() || !it.favorite }
+                    if (mangas.isEmpty() && page == 1) {
+                        withUIContext { view?.onAddPageError(NoResultsException()) }
+                        return@onEach
+                    }
+                    initializeMangas(mangas)
+                    val items = mangas.map {
+                        BrowseSourceItem(it, browseAsList, sourceListType, outlineCovers)
+                    }
+                    this@BrowseSourcePresenter.items.addAll(items)
+                    withUIContext { view?.onAddPage(page, items) }
+                } catch (error: Exception) {
                     Timber.e(error)
                 }
-            )
+            }.collect()
+        }
 
         // Request first page.
         requestNext()
@@ -196,14 +198,14 @@ open class BrowseSourcePresenter(
     fun requestNext() {
         if (!hasNextPage()) return
 
-        pageSubscription?.let { remove(it) }
-        pageSubscription = Observable.defer { pager.requestNext() }
-            .subscribeFirst(
-                { _, _ ->
-                    // Nothing to do when onNext is emitted.
-                },
-                BrowseSourceController::onAddPageError
-            )
+        nextPageJob?.cancel()
+        nextPageJob = presenterScope.launchIO {
+            try {
+                pager.requestNextPage()
+            } catch (e: Throwable) {
+                withUIContext { view?.onAddPageError(e) }
+            }
+        }
     }
 
     /**
@@ -211,39 +213,6 @@ open class BrowseSourcePresenter(
      */
     fun hasNextPage(): Boolean {
         return pager.hasNextPage
-    }
-
-    /**
-     * Sets the display mode.
-     *
-     * @param asList whether the current mode is in list or not.
-     */
-    private fun setDisplayMode(asList: Boolean) {
-        isListMode = asList
-        subscribeToMangaInitializer()
-    }
-
-    /**
-     * Subscribes to the initializer of manga details and updates the view if needed.
-     */
-    private fun subscribeToMangaInitializer() {
-        initializerSubscription?.let { remove(it) }
-        initializerSubscription = mangaDetailSubject.observeOn(Schedulers.io())
-            .flatMap { Observable.from(it) }
-            .filter { it.thumbnail_url == null && !it.initialized }
-            .concatMap { getMangaDetailsObservable(it) }
-            .onBackpressureBuffer()
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe(
-                { manga ->
-                    @Suppress("DEPRECATION")
-                    view?.onMangaInitialized(manga)
-                },
-                { error ->
-                    Timber.e(error)
-                }
-            )
-            .apply { add(this) }
     }
 
     /**
@@ -264,6 +233,10 @@ open class BrowseSourcePresenter(
         } else if (localManga.title.isBlank()) {
             localManga.title = sManga.title
             db.insertManga(localManga).executeAsBlocking()
+        } else if (!localManga.favorite) {
+            // if the manga isn't a favorite, set its display title from source
+            // if it later becomes a favorite, updated title will go to db
+            localManga.title = sManga.title
         }
         return localManga
     }
@@ -274,24 +247,34 @@ open class BrowseSourcePresenter(
      * @param mangas the list of manga to initialize.
      */
     fun initializeMangas(mangas: List<Manga>) {
-        mangaDetailSubject.onNext(mangas)
+        presenterScope.launchIO {
+            mangas.asFlow()
+                .filter { it.thumbnail_url == null && !it.initialized }
+                .map { getMangaDetails(it) }
+                .onEach {
+                    withUIContext { view?.onMangaInitialized(it) }
+                }
+                .catch { e -> Timber.e(e) }
+                .collect()
+        }
     }
 
     /**
-     * Returns an observable of manga that initializes the given manga.
+     * Returns the initialized manga.
      *
      * @param manga the manga to initialize.
-     * @return an observable of the manga to initialize
+     * @return the initialized manga
      */
-    private fun getMangaDetailsObservable(manga: Manga): Observable<Manga> {
-        return source.fetchMangaDetails(manga)
-            .flatMap { networkManga ->
-                manga.copyFrom(networkManga)
-                manga.initialized = true
-                db.insertManga(manga).executeAsBlocking()
-                Observable.just(manga)
-            }
-            .onErrorResumeNext { Observable.just(manga) }
+    private suspend fun getMangaDetails(manga: Manga): Manga {
+        try {
+            val networkManga = source.getMangaDetails(manga.copy())
+            manga.copyFrom(networkManga)
+            manga.initialized = true
+            db.insertManga(manga).executeAsBlocking()
+        } catch (e: Exception) {
+            Timber.e(e)
+        }
+        return manga
     }
 
     fun confirmDeletion(manga: Manga) {
@@ -303,37 +286,36 @@ open class BrowseSourcePresenter(
     }
 
     /**
-     * Changes the active display mode.
-     */
-    fun swapDisplayMode() {
-        prefs.browseAsList().set(!isListMode)
-    }
-
-    /**
      * Set the filter states for the current source.
      *
      * @param filters a list of active filters.
      */
     fun setSourceFilter(filters: FilterList) {
+        filtersChanged = true
         restartPager(filters = filters)
     }
 
     open fun createPager(query: String, filters: FilterList): Pager {
-        return BrowseSourcePager(source, query, filters)
+        return if (useLatest && query.isBlank() && !filtersChanged) {
+            LatestUpdatesPager(source)
+        } else {
+            useLatest = false
+            BrowseSourcePager(source, query, filters)
+        }
     }
 
     private fun FilterList.toItems(): List<IFlexible<*>> {
-        return mapNotNull {
-            when (it) {
-                is Filter.Header -> HeaderItem(it)
-                is Filter.Separator -> SeparatorItem(it)
-                is Filter.CheckBox -> CheckboxItem(it)
-                is Filter.TriState -> TriStateItem(it)
-                is Filter.Text -> TextItem(it)
-                is Filter.Select<*> -> SelectItem(it)
+        return mapNotNull { filter ->
+            when (filter) {
+                is Filter.Header -> HeaderItem(filter)
+                is Filter.Separator -> SeparatorItem(filter)
+                is Filter.CheckBox -> CheckboxItem(filter)
+                is Filter.TriState -> TriStateItem(filter)
+                is Filter.Text -> TextItem(filter)
+                is Filter.Select<*> -> SelectItem(filter)
                 is Filter.Group<*> -> {
-                    val group = GroupItem(it)
-                    val subItems = it.state.mapNotNull { type ->
+                    val group = GroupItem(filter)
+                    val subItems = filter.state.mapNotNull { type ->
                         when (type) {
                             is Filter.CheckBox -> CheckboxSectionItem(type)
                             is Filter.TriState -> TriStateSectionItem(type)
@@ -347,8 +329,8 @@ open class BrowseSourcePresenter(
                     group
                 }
                 is Filter.Sort -> {
-                    val group = SortGroup(it)
-                    val subItems = it.values.map {
+                    val group = SortGroup(filter)
+                    val subItems = filter.values.map {
                         SortItem(it, group)
                     }
                     group.subItems = subItems

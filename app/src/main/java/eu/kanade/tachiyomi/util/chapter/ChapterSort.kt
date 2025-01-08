@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.util.chapter
 import eu.kanade.tachiyomi.data.database.models.Chapter
 import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
+import eu.kanade.tachiyomi.util.chapter.ChapterFilter.Companion.filterChaptersByScanlators
 import eu.kanade.tachiyomi.util.lang.compareToCaseInsensitiveNaturalOrder
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -13,13 +14,13 @@ class ChapterSort(val manga: Manga, val chapterFilter: ChapterFilter = Injekt.ge
         rawChapters: List<T>,
         andFiltered: Boolean = true,
         filterForReader: Boolean = false,
-        currentChapter: T? = null
+        currentChapter: T? = null,
     ): List<T> {
         val chapters = when {
             filterForReader -> chapterFilter.filterChaptersForReader(
                 rawChapters,
                 manga,
-                currentChapter
+                currentChapter,
             )
             andFiltered -> chapterFilter.filterChapters(rawChapters, manga)
             else -> rawChapters
@@ -28,10 +29,10 @@ class ChapterSort(val manga: Manga, val chapterFilter: ChapterFilter = Injekt.ge
         return chapters.sortedWith(sortComparator())
     }
 
-    fun <T : Chapter> getNextUnreadChapter(rawChapters: List<T>, andFiltered: Boolean = true,): T? {
+    fun <T : Chapter> getNextUnreadChapter(rawChapters: List<T>, andFiltered: Boolean = true): T? {
         val chapters = when {
             andFiltered -> chapterFilter.filterChapters(rawChapters, manga)
-            else -> chapterFilter.filterChaptersByScanlators(rawChapters, manga)
+            else -> rawChapters.filterChaptersByScanlators(manga)
         }
 
         return chapters.sortedWith(sortComparator(true)).find { !it.read }

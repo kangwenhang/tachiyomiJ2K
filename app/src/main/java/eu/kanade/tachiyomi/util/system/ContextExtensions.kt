@@ -1,12 +1,10 @@
 package eu.kanade.tachiyomi.util.system
 
-import android.app.ActivityManager
+import android.app.LocaleManager
 import android.app.Notification
 import android.app.NotificationManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.content.res.Configuration
@@ -34,15 +32,20 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
+import androidx.work.CoroutineWorker
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.hippo.unifile.UniFile
-import com.nononsenseapps.filepicker.FilePickerActivity
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
+import eu.kanade.tachiyomi.extension.util.ExtensionLoader
 import eu.kanade.tachiyomi.ui.main.MainActivity
-import eu.kanade.tachiyomi.widget.CustomLayoutPickerActivity
+import timber.log.Timber
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
+import java.util.Locale
+import kotlin.math.max
 
 private const val TABLET_UI_MIN_SCREEN_WIDTH_DP = 720
 
@@ -69,7 +72,7 @@ fun Context.toast(text: String?, duration: Int = Toast.LENGTH_SHORT) {
 /**
  * Helper method to create a notification.
  *
- * @param id the channel id.
+ * @param channelId the channel id.
  * @param func the function that will execute inside the builder.
  * @return a notification to be displayed or updated.
  */
@@ -80,28 +83,6 @@ inline fun Context.notification(channelId: String, func: NotificationCompat.Buil
 }
 
 /**
- * Helper method to construct an Intent to use a custom file picker.
- * @param currentDir the path the file picker will open with.
- * @return an Intent to start the file picker activity.
- */
-fun Context.getFilePicker(currentDir: String): Intent {
-    return Intent(this, CustomLayoutPickerActivity::class.java)
-        .putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)
-        .putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true)
-        .putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_DIR)
-        .putExtra(FilePickerActivity.EXTRA_START_PATH, currentDir)
-}
-
-/**
- * Checks if the give permission is granted.
- *
- * @param permission the permission to check.
- * @return true if it has permissions.
- */
-fun Context.hasPermission(permission: String) =
-    ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
-
-/**
  * Returns the color for the given attribute.
  *
  * @param resource the attribute.
@@ -110,6 +91,13 @@ fun Context.hasPermission(permission: String) =
 fun Context.getResourceColor(@AttrRes resource: Int): Int {
     val typedArray = obtainStyledAttributes(intArrayOf(resource))
     val attrValue = typedArray.getColor(0, 0)
+    typedArray.recycle()
+    return attrValue
+}
+
+fun Context.getResourceDrawable(@AttrRes resource: Int): Drawable? {
+    val typedArray = obtainStyledAttributes(intArrayOf(resource))
+    val attrValue = typedArray.getDrawable(0)
     typedArray.recycle()
     return attrValue
 }
@@ -138,6 +126,9 @@ fun Context.contextCompatDrawable(@DrawableRes resource: Int): Drawable? {
 val Int.pxToDp: Int
     get() = (this / Resources.getSystem().displayMetrics.density).toInt()
 
+val Float.pxToDp: Float
+    get() = (this / Resources.getSystem().displayMetrics.density)
+
 /**
  * Converts to px.
  */
@@ -151,16 +142,17 @@ val Float.dpToPx: Float
     get() = (this * Resources.getSystem().displayMetrics.density)
 
 /** Converts to px and takes into account LTR/RTL layout */
-val Float.dpToPxEnd: Float
-    get() = (
-        this * Resources.getSystem().displayMetrics.density *
-            if (Resources.getSystem().isLTR) 1 else -1
-        )
+fun Float.dpToPxEnd(resources: Resources): Float {
+    return this * resources.displayMetrics.density * if (resources.isLTR) 1 else -1
+}
 
 val Resources.isLTR
     get() = configuration.layoutDirection == View.LAYOUT_DIRECTION_LTR
 
 fun Context.isTablet() = resources.configuration.smallestScreenWidthDp >= 600
+
+val displayMaxHeightInPx: Int
+    get() = Resources.getSystem().displayMetrics.let { max(it.heightPixels, it.widthPixels) }
 
 /** Gets the duration multiplier for general animations on the device
  * @see Settings.Global.ANIMATOR_DURATION_SCALE
@@ -171,13 +163,13 @@ val Context.animatorDurationScale: Float
 /**
  * Helper method to create a notification builder.
  *
- * @param id the channel id.
+ * @param channelId the channel id.
  * @param block the function that will execute inside the builder.
  * @return a notification to be displayed or updated.
  */
 fun Context.notificationBuilder(
     channelId: String,
-    block: (NotificationCompat.Builder.() -> Unit)? = null
+    block: (NotificationCompat.Builder.() -> Unit)? = null,
 ): NotificationCompat.Builder {
     val builder = NotificationCompat.Builder(this, channelId)
         .setColor(ContextCompat.getColor(this, R.color.secondaryTachiyomi))
@@ -217,21 +209,23 @@ fun Context.withOriginalWidth(): Context {
     return this
 }
 
-fun Context.isLandscape(): Boolean {
-    return resources.configuration?.orientation == Configuration.ORIENTATION_LANDSCAPE
+fun Context.extensionIntentForText(text: String): Intent? {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(text))
+    val info = packageManager.queryIntentActivitiesCompat(intent, PackageManager.MATCH_ALL)
+        .firstOrNull {
+            try {
+                val pkgName = it.activityInfo.packageName
+                ExtensionLoader.isPackageNameAnExtension(packageManager, pkgName)
+            } catch (_: Exception) {
+                false
+            }
+        } ?: return null
+    intent.setClassName(info.activityInfo.packageName, info.activityInfo.name)
+    return intent
 }
 
-/**
- * Convenience method to acquire a partial wake lock.
- */
-fun Context.acquireWakeLock(tag: String? = null, timeout: Long? = null): PowerManager.WakeLock {
-    val wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "${tag ?: javaClass.name}:WakeLock")
-    if (timeout != null) {
-        wakeLock.acquire(timeout)
-    } else {
-        wakeLock.acquire()
-    }
-    return wakeLock
+fun Context.isLandscape(): Boolean {
+    return resources.configuration?.orientation == Configuration.ORIENTATION_LANDSCAPE
 }
 
 /**
@@ -248,9 +242,9 @@ fun Context.getUriSize(uri: Uri): Long? {
  */
 fun Context.isPackageInstalled(packageName: String): Boolean {
     return try {
-        packageManager.getApplicationInfo(packageName, 0)
+        packageManager.getApplicationInfoCompat(packageName, 0)
         true
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         false
     }
 }
@@ -277,51 +271,6 @@ val Context.powerManager: PowerManager
     get() = getSystemService()!!
 
 /**
- * Function used to send a local broadcast asynchronous
- *
- * @param intent intent that contains broadcast information
- */
-fun Context.sendLocalBroadcast(intent: Intent) {
-    androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(this).sendBroadcast(
-        intent
-    )
-}
-
-/**
- * Function used to send a local broadcast synchronous
- *
- * @param intent intent that contains broadcast information
- */
-fun Context.sendLocalBroadcastSync(intent: Intent) {
-    androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(this).sendBroadcastSync(
-        intent
-    )
-}
-
-/**
- * Function used to register local broadcast
- *
- * @param receiver receiver that gets registered.
- */
-fun Context.registerLocalReceiver(receiver: BroadcastReceiver, filter: IntentFilter) {
-    androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(this).registerReceiver(
-        receiver,
-        filter
-    )
-}
-
-/**
- * Function used to unregister local broadcast
- *
- * @param receiver receiver that gets unregistered.
- */
-fun Context.unregisterLocalReceiver(receiver: BroadcastReceiver) {
-    androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(this).unregisterReceiver(
-        receiver
-    )
-}
-
-/**
  * Returns true if device is connected to Wifi.
  */
 fun Context.isConnectedToWifi(): Boolean {
@@ -339,30 +288,26 @@ fun Context.isConnectedToWifi(): Boolean {
     }
 }
 
-/**
- * Returns true if the given service class is running.
- */
-fun Context.isServiceRunning(serviceClass: Class<*>): Boolean {
-    val className = serviceClass.name
-    val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-    @Suppress("DEPRECATION")
-    return manager.getRunningServices(Integer.MAX_VALUE)
-        .any { className == it.service.className }
+fun Context.openInBrowser(url: String, @ColorInt toolbarColor: Int? = null, forceBrowser: Boolean = false) {
+    this.openInBrowser(url.toUri(), toolbarColor, forceBrowser)
 }
 
-fun Context.openInBrowser(url: String, @ColorInt toolbarColor: Int? = null) {
-    this.openInBrowser(url.toUri(), toolbarColor)
-}
-
-fun Context.openInBrowser(uri: Uri, @ColorInt toolbarColor: Int? = null) {
+fun Context.openInBrowser(uri: Uri, @ColorInt toolbarColor: Int? = null, forceBrowser: Boolean = false) {
     try {
         val intent = CustomTabsIntent.Builder()
             .setDefaultColorSchemeParams(
                 CustomTabColorSchemeParams.Builder()
                     .setToolbarColor(toolbarColor ?: getResourceColor(R.attr.colorPrimaryVariant))
-                    .build()
+                    .build(),
             )
             .build()
+        if (forceBrowser) {
+            val packages = getCustomTabsPackages().maxByOrNull { it.preferredOrder }
+            val processName = packages?.activityInfo?.processName
+            if (processName == null) {
+                intent.intent.`package` = processName
+            }
+        }
         intent.launchUrl(this, uri)
     } catch (e: Exception) {
         toast(e.message)
@@ -372,22 +317,29 @@ fun Context.openInBrowser(uri: Uri, @ColorInt toolbarColor: Int? = null) {
 /**
  * Opens a URL in a custom tab.
  */
-fun Context.openInBrowser(url: String, forceBrowser: Boolean): Boolean {
+fun Context.openInBrowser(url: String, forceBrowser: Boolean, fullBrowser: Boolean = true): Boolean {
     try {
         val parsedUrl = url.toUri()
-        val intent = CustomTabsIntent.Builder()
-            .setDefaultColorSchemeParams(
-                CustomTabColorSchemeParams.Builder()
-                    .setToolbarColor(getResourceColor(R.attr.colorPrimaryVariant))
-                    .build()
-            )
-            .build()
-        if (forceBrowser) {
-            val packages = getCustomTabsPackages().maxByOrNull { it.preferredOrder }
-            val processName = packages?.activityInfo?.processName ?: return false
-            intent.intent.`package` = processName
+        if (forceBrowser && fullBrowser) {
+            val intent = Intent(Intent.ACTION_VIEW, parsedUrl).apply {
+                defaultBrowserPackageName()?.let { setPackage(it) }
+            }
+            startActivity(intent)
+        } else {
+            val intent = CustomTabsIntent.Builder()
+                .setDefaultColorSchemeParams(
+                    CustomTabColorSchemeParams.Builder()
+                        .setToolbarColor(getResourceColor(R.attr.colorPrimaryVariant))
+                        .build(),
+                )
+                .build()
+            if (forceBrowser) {
+                val packages = getCustomTabsPackages().maxByOrNull { it.preferredOrder }
+                val processName = packages?.activityInfo?.processName ?: return false
+                intent.intent.`package` = processName
+            }
+            intent.launchUrl(this, parsedUrl)
         }
-        intent.launchUrl(this, parsedUrl)
         return true
     } catch (e: Exception) {
         toast(e.message)
@@ -395,22 +347,28 @@ fun Context.openInBrowser(url: String, forceBrowser: Boolean): Boolean {
     }
 }
 
+fun Context.defaultBrowserPackageName(): String? {
+    val browserIntent = Intent(Intent.ACTION_VIEW, "http://".toUri())
+    return packageManager.resolveActivityCompat(browserIntent, PackageManager.MATCH_DEFAULT_ONLY)
+        ?.activityInfo?.packageName
+        ?.takeUnless { it in DeviceUtil.invalidDefaultBrowsers }
+}
+
 /**
  * Returns a list of packages that support Custom Tabs.
  */
 fun Context.getCustomTabsPackages(): ArrayList<ResolveInfo> {
-    val pm = packageManager
     // Get default VIEW intent handler.
-    val activityIntent = Intent(Intent.ACTION_VIEW, "http://www.example.com".toUri())
+    val activityIntent = Intent(Intent.ACTION_VIEW, "https://www.example.com".toUri())
     // Get all apps that can handle VIEW intents.
-    val resolvedActivityList = pm.queryIntentActivities(activityIntent, 0)
+    val resolvedActivityList = packageManager.queryIntentActivitiesCompat(activityIntent, 0)
     val packagesSupportingCustomTabs = ArrayList<ResolveInfo>()
     for (info in resolvedActivityList) {
         val serviceIntent = Intent()
         serviceIntent.action = ACTION_CUSTOM_TABS_CONNECTION
         serviceIntent.setPackage(info.activityInfo.packageName)
         // Check if this package also resolves the Custom Tabs service.
-        if (pm.resolveService(serviceIntent, 0) != null) {
+        if (packageManager.resolveServiceCompat(serviceIntent, 0) != null) {
             packagesSupportingCustomTabs.add(info)
         }
     }
@@ -423,25 +381,22 @@ fun Context.isInNightMode(): Boolean {
 }
 
 fun Context.appDelegateNightMode(): Int {
-    return if (isInNightMode()) AppCompatDelegate.MODE_NIGHT_YES
-    else AppCompatDelegate.MODE_NIGHT_NO
+    return if (isInNightMode()) {
+        AppCompatDelegate.MODE_NIGHT_YES
+    } else {
+        AppCompatDelegate.MODE_NIGHT_NO
+    }
 }
 
 fun Context.isOnline(): Boolean {
-    val connectivityManager = this
-        .getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-    var result = false
-    connectivityManager?.let {
-        val networkCapabilities = connectivityManager.activeNetwork ?: return false
-        val actNw = connectivityManager.getNetworkCapabilities(networkCapabilities) ?: return false
-        val maxTransport = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 -> NetworkCapabilities.TRANSPORT_LOWPAN
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> NetworkCapabilities.TRANSPORT_WIFI_AWARE
-            else -> NetworkCapabilities.TRANSPORT_VPN
-        }
-        result = (NetworkCapabilities.TRANSPORT_CELLULAR..maxTransport).any(actNw::hasTransport)
+    val networkCapabilities = connectivityManager.activeNetwork ?: return false
+    val actNw = connectivityManager.getNetworkCapabilities(networkCapabilities) ?: return false
+    val maxTransport = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 -> NetworkCapabilities.TRANSPORT_LOWPAN
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> NetworkCapabilities.TRANSPORT_WIFI_AWARE
+        else -> NetworkCapabilities.TRANSPORT_VPN
     }
-    return result
+    return (NetworkCapabilities.TRANSPORT_CELLULAR..maxTransport).any(actNw::hasTransport)
 }
 
 fun Context.createFileInCacheDir(name: String): File {
@@ -452,3 +407,64 @@ fun Context.createFileInCacheDir(name: String): File {
     file.createNewFile()
     return file
 }
+
+fun Context.getApplicationIcon(pkgName: String): Drawable? {
+    return try {
+        packageManager.getApplicationIcon(pkgName)
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
+    }
+}
+
+/** Context used for notifications as Appcompat app lang does not support notifications */
+val Context.localeContext: Context
+    get() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return this
+        val pref = Injekt.get<PreferencesHelper>()
+        val prefsLang = if (pref.appLanguage().isSet()) {
+            Locale.forLanguageTag(pref.appLanguage().get())
+        } else {
+            null
+        }
+        val configuration = Configuration(resources.configuration)
+        configuration.setLocale(
+            prefsLang
+                ?: AppCompatDelegate.getApplicationLocales()[0]
+                ?: Locale.getDefault(),
+        )
+        return createConfigurationContext(configuration)
+    }
+
+fun setLocaleByAppCompat() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        AppCompatDelegate.getApplicationLocales().get(0)?.let { Locale.setDefault(it) }
+    }
+}
+
+suspend fun CoroutineWorker.tryToSetForeground() {
+    try {
+        setForeground(getForegroundInfo())
+    } catch (e: IllegalStateException) {
+        Timber.e(e, "Not allowed to set foreground job")
+    }
+}
+
+fun WorkManager.jobIsRunning(tag: String): Boolean = getWorkInfosForUniqueWork(tag).get()
+    .let { list -> list.count { it.state == WorkInfo.State.RUNNING } == 1 }
+
+val Context.systemLangContext: Context
+    get() {
+        val configuration = Configuration(resources.configuration)
+
+        val systemLocale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getSystemService<LocaleManager>()?.systemLocales?.get(0)
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                Resources.getSystem().configuration.locales.get(0)
+            } else {
+                return this
+            } ?: Locale.getDefault()
+        }
+        configuration.setLocale(systemLocale)
+        return createConfigurationContext(configuration)
+    }

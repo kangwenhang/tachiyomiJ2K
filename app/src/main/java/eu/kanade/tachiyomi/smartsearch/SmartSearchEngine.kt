@@ -5,19 +5,17 @@ import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.util.lang.toNormalized
-import eu.kanade.tachiyomi.util.system.await
 import info.debatty.java.stringsimilarity.NormalizedLevenshtein
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.supervisorScope
-import rx.schedulers.Schedulers
 import uy.kohesive.injekt.injectLazy
 import kotlin.coroutines.CoroutineContext
 
 class SmartSearchEngine(
     parentContext: CoroutineContext,
-    val extraSearchParams: String? = null
+    val extraSearchParams: String? = null,
 ) : CoroutineScope {
     override val coroutineContext: CoroutineContext = parentContext + Job() + Dispatchers.Default
 
@@ -37,8 +35,7 @@ class SmartSearchEngine(
                         "$query ${extraSearchParams.trim()}"
                     } else query
 
-                    val searchResults = source.fetchSearchManga(1, builtQuery, FilterList())
-                        .toSingle().await(Schedulers.io())
+                    val searchResults = source.getSearchManga(1, builtQuery, FilterList())
 
                     searchResults.mangas.map {
                         val cleanedMangaTitle = cleanSmartSearchTitle(it.title)
@@ -59,10 +56,11 @@ class SmartSearchEngine(
         val eligibleManga = supervisorScope {
             val searchQuery = if (extraSearchParams != null) {
                 "$titleNormalized ${extraSearchParams.trim()}"
-            } else titleNormalized
+            } else {
+                titleNormalized
+            }
             val searchResults =
-                source.fetchSearchManga(1, searchQuery, source.getFilterList()).toSingle()
-                    .await(Schedulers.io())
+                source.getSearchManga(1, searchQuery, source.getFilterList())
 
             if (searchResults.mangas.size == 1) {
                 return@supervisorScope listOf(SearchEntry(searchResults.mangas.first(), 0.0))
@@ -83,7 +81,7 @@ class SmartSearchEngine(
             '(' to ')',
             '[' to ']',
             '<' to '>',
-            '{' to '}'
+            '{' to '}',
         )
         var openingBracketPairs = bracketPairs.mapIndexed { index, (opening, _) ->
             opening to index

@@ -26,8 +26,11 @@ internal class AppUpdateNotifier(private val context: Context) {
     /**
      * Builder to manage notifications.
      */
-    private val notificationBuilder by lazy {
-        NotificationCompat.Builder(context, Notifications.CHANNEL_COMMON)
+    val notificationBuilder by lazy {
+        NotificationCompat.Builder(context, Notifications.CHANNEL_COMMON).apply {
+            setSmallIcon(android.R.drawable.stat_sys_download)
+            setContentTitle(context.getString(R.string.app_name))
+        }
     }
 
     companion object {
@@ -43,17 +46,25 @@ internal class AppUpdateNotifier(private val context: Context) {
         context.notificationManager.notify(id, build())
     }
 
-    fun promptUpdate(body: String, url: String, releaseUrl: String) {
-        val intent = Intent(context, AppUpdateService::class.java).apply {
-            putExtra(AppUpdateService.EXTRA_DOWNLOAD_URL, url)
-            putExtra(AppUpdateService.EXTRA_NOTIFY_ON_INSTALL, true)
-        }
+    fun promptUpdate(release: GithubRelease) {
+        val body = release.info
+        val url = release.downloadLink
+        val releaseUrl = release.releaseLink
+        val isBeta = release.preRelease == true
 
         val pendingIntent = NotificationReceiver.openUpdatePendingActivity(context, body, url)
         releasePageUrl = releaseUrl
         with(notificationBuilder) {
             setContentTitle(context.getString(R.string.app_name))
-            setContentText(context.getString(R.string.new_version_available))
+            setContentText(
+                context.getString(
+                    if (isBeta) {
+                        R.string.new_beta_version_available
+                    } else {
+                        R.string.new_version_available
+                    },
+                ),
+            )
             setContentIntent(pendingIntent)
             setAutoCancel(true)
             setSmallIcon(android.R.drawable.stat_sys_download_done)
@@ -64,12 +75,7 @@ internal class AppUpdateNotifier(private val context: Context) {
             addAction(
                 android.R.drawable.stat_sys_download_done,
                 context.getString(if (isOnA12) R.string.update else R.string.download),
-                PendingIntent.getService(
-                    context,
-                    0,
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
+                NotificationReceiver.startAppUpdatePendingJob(context, url, true),
             )
             addReleasePageAction()
         }
@@ -84,7 +90,7 @@ internal class AppUpdateNotifier(private val context: Context) {
             addAction(
                 R.drawable.ic_new_releases_24dp,
                 context.getString(R.string.release_page),
-                PendingIntent.getActivity(context, releaseUrl.hashCode(), releaseIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                PendingIntent.getActivity(context, releaseUrl.hashCode(), releaseIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE),
             )
         }
     }
@@ -94,20 +100,19 @@ internal class AppUpdateNotifier(private val context: Context) {
      *
      * @param title tile of notification.
      */
-    fun onDownloadStarted(title: String): NotificationCompat.Builder {
+    fun onDownloadStarted(): NotificationCompat.Builder {
         with(notificationBuilder) {
-            setContentTitle(title)
+            setContentTitle(context.getString(R.string.app_name))
             setContentText(context.getString(R.string.downloading))
             setSmallIcon(android.R.drawable.stat_sys_download)
+            setProgress(0, 0, true)
             setAutoCancel(false)
             setOngoing(true)
             clearActions()
-
-            // Cancel action
             addAction(
                 R.drawable.ic_close_24dp,
                 context.getString(R.string.cancel),
-                NotificationReceiver.cancelUpdateDownloadPendingBroadcast(context)
+                NotificationReceiver.cancelUpdateDownloadPendingBroadcast(context),
             )
             addReleasePageAction()
         }
@@ -122,10 +127,30 @@ internal class AppUpdateNotifier(private val context: Context) {
      */
     fun onProgressChange(progress: Int) {
         with(notificationBuilder) {
+            setContentTitle(context.getString(R.string.app_name))
+            setContentText(context.getString(R.string.downloading))
+            setSmallIcon(android.R.drawable.stat_sys_download)
             setProgress(100, progress, false)
             setOnlyAlertOnce(true)
+            clearActions()
+            addAction(
+                R.drawable.ic_close_24dp,
+                context.getString(R.string.cancel),
+                NotificationReceiver.cancelUpdateDownloadPendingBroadcast(context),
+            )
         }
         notificationBuilder.show()
+    }
+
+    fun onInstalling() {
+        with(NotificationCompat.Builder(context, Notifications.CHANNEL_INSTALLING)) {
+            setContentTitle(context.getString(R.string.installing))
+            setSmallIcon(android.R.drawable.stat_sys_download)
+            setProgress(0, 0, true)
+            setOnlyAlertOnce(true)
+            clearActions()
+            show(Notifications.ID_INSTALL)
+        }
     }
 
     /**
@@ -146,27 +171,24 @@ internal class AppUpdateNotifier(private val context: Context) {
             addAction(
                 R.drawable.ic_system_update_24dp,
                 context.getString(R.string.install),
-                NotificationHandler.installApkPendingActivity(context, uri)
+                NotificationHandler.installApkPendingActivity(context, uri),
             )
             // Cancel action
             addAction(
                 R.drawable.ic_close_24dp,
                 context.getString(R.string.cancel),
-                NotificationReceiver.dismissNotificationPendingBroadcast(context, Notifications.ID_INSTALL)
+                NotificationReceiver.dismissNotificationPendingBroadcast(context, Notifications.ID_INSTALL),
             )
             addReleasePageAction()
         }
         notificationBuilder.show(Notifications.ID_INSTALL)
     }
 
-    /**
-     * Call when apk download is finished.
-     *
-     * @param uri path location of apk.
-     */
+    /** Call when apk download is finished. */
     fun onInstallFinished() {
         with(NotificationCompat.Builder(context, Notifications.CHANNEL_UPDATED)) {
-            setContentTitle(context.getString(R.string.updated_to_, BuildConfig.VERSION_NAME))
+            setContentTitle(context.getString(R.string.update_completed))
+            setContentText(context.getString(R.string.updated_to_, BuildConfig.VERSION_NAME))
             setSmallIcon(R.drawable.ic_tachij2k_notification)
             setAutoCancel(true)
             setOngoing(false)
@@ -175,10 +197,15 @@ internal class AppUpdateNotifier(private val context: Context) {
                 context,
                 0,
                 context.packageManager.getLaunchIntentForPackage(BuildConfig.APPLICATION_ID),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             setContentIntent(pendingIntent)
             clearActions()
+            addAction(
+                R.drawable.ic_system_update_24dp,
+                context.getString(R.string.open),
+                pendingIntent,
+            )
             addReleasePageAction()
             show(Notifications.ID_INSTALLED)
         }
@@ -202,13 +229,13 @@ internal class AppUpdateNotifier(private val context: Context) {
             addAction(
                 R.drawable.ic_refresh_24dp,
                 context.getString(R.string.retry),
-                AppUpdateService.downloadApkPendingService(context, url)
+                NotificationReceiver.startAppUpdatePendingJob(context, url),
             )
             // Cancel action
             addAction(
                 R.drawable.ic_close_24dp,
                 context.getString(R.string.cancel),
-                NotificationReceiver.dismissNotificationPendingBroadcast(context, Notifications.ID_UPDATER)
+                NotificationReceiver.dismissNotificationPendingBroadcast(context, Notifications.ID_UPDATER),
             )
             addReleasePageAction()
         }
@@ -217,6 +244,7 @@ internal class AppUpdateNotifier(private val context: Context) {
 
     fun onInstallError(uri: Uri) {
         with(notificationBuilder) {
+            setContentTitle(context.getString(R.string.app_name))
             setContentText(context.getString(R.string.could_not_install_update))
             setSmallIcon(android.R.drawable.stat_sys_warning)
             setOnlyAlertOnce(false)
@@ -228,13 +256,13 @@ internal class AppUpdateNotifier(private val context: Context) {
             addAction(
                 R.drawable.ic_refresh_24dp,
                 context.getString(R.string.retry),
-                NotificationHandler.installApkPendingActivity(context, uri)
+                NotificationHandler.installApkPendingActivity(context, uri),
             )
             // Cancel action
             addAction(
                 R.drawable.ic_close_24dp,
                 context.getString(R.string.cancel),
-                NotificationReceiver.dismissNotificationPendingBroadcast(context, Notifications.ID_UPDATER)
+                NotificationReceiver.dismissNotificationPendingBroadcast(context, Notifications.ID_UPDATER),
             )
             addReleasePageAction()
         }
@@ -243,5 +271,9 @@ internal class AppUpdateNotifier(private val context: Context) {
 
     fun cancel() {
         NotificationReceiver.dismissNotification(context, Notifications.ID_UPDATER)
+    }
+
+    fun cancelInstallNotification() {
+        NotificationReceiver.dismissNotification(context, Notifications.ID_INSTALL)
     }
 }

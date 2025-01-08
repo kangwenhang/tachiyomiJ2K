@@ -1,35 +1,21 @@
 package eu.kanade.tachiyomi.ui.extension
 
 import android.content.pm.PackageInstaller
-import androidx.core.content.ContextCompat
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.data.database.DatabaseHelper
-import eu.kanade.tachiyomi.data.database.models.Manga
-import eu.kanade.tachiyomi.data.preference.PreferencesHelper
-import eu.kanade.tachiyomi.extension.ExtensionInstallService
+import eu.kanade.tachiyomi.extension.ExtensionInstallerJob
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.extension.model.Extension
 import eu.kanade.tachiyomi.extension.model.InstallStep
 import eu.kanade.tachiyomi.extension.model.InstalledExtensionsOrder
-import eu.kanade.tachiyomi.source.LocalSource
-import eu.kanade.tachiyomi.source.Source
-import eu.kanade.tachiyomi.source.SourceManager
-import eu.kanade.tachiyomi.ui.base.presenter.BaseCoroutinePresenter
-import eu.kanade.tachiyomi.ui.migration.MangaItem
-import eu.kanade.tachiyomi.ui.migration.SelectionHeader
-import eu.kanade.tachiyomi.ui.migration.SourceItem
+import eu.kanade.tachiyomi.extension.util.ExtensionLoader
+import eu.kanade.tachiyomi.ui.migration.BaseMigrationPresenter
 import eu.kanade.tachiyomi.util.system.LocaleHelper
-import eu.kanade.tachiyomi.util.system.executeOnIO
 import eu.kanade.tachiyomi.util.system.withUIContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 
 typealias ExtensionTuple =
     Triple<List<Extension.Installed>, List<Extension.Untrusted>, List<Extension.Available>>
@@ -38,77 +24,47 @@ typealias ExtensionIntallInfo = Pair<InstallStep, PackageInstaller.SessionInfo?>
 /**
  * Presenter of [ExtensionBottomSheet].
  */
-class ExtensionBottomPresenter(
-    private val bottomSheet: ExtensionBottomSheet,
-    private val extensionManager: ExtensionManager = Injekt.get(),
-    val preferences: PreferencesHelper = Injekt.get()
-) : BaseCoroutinePresenter() {
+class ExtensionBottomPresenter : BaseMigrationPresenter<ExtensionBottomSheet>() {
 
     private var extensions = emptyList<ExtensionItem>()
 
-    var sourceItems = emptyList<SourceItem>()
-        private set
-
-    var mangaItems = hashMapOf<Long, List<MangaItem>>()
-        private set
-
     private var currentDownloads = hashMapOf<String, ExtensionIntallInfo>()
 
-    private val sourceManager: SourceManager = Injekt.get()
-
-    private var selectedSource: Long? = null
     private var firstLoad = true
-    private val db: DatabaseHelper = Injekt.get()
 
     override fun onCreate() {
         super.onCreate()
         presenterScope.launch {
             val extensionJob = async {
-                extensionManager.findAvailableExtensionsAsync()
+                extensionManager.findAvailableExtensions()
                 extensions = toItems(
                     Triple(
-                        extensionManager.installedExtensions,
-                        extensionManager.untrustedExtensions,
-                        extensionManager.availableExtensions
-                    )
+                        extensionManager.installedExtensionsFlow.value,
+                        extensionManager.untrustedExtensionsFlow.value,
+                        extensionManager.availableExtensionsFlow.value,
+                    ),
                 )
-                withContext(Dispatchers.Main) { bottomSheet.setExtensions(extensions) }
+                withContext(Dispatchers.Main) { view?.setExtensions(extensions, false) }
             }
-            val migrationJob = async {
-                val favs = db.getFavoriteMangas().executeOnIO()
-                sourceItems = findSourcesWithManga(favs)
-                mangaItems = HashMap(
-                    sourceItems.associate {
-                        it.source.id to this@ExtensionBottomPresenter.libraryToMigrationItem(
-                            favs,
-                            it.source.id
-                        )
-                    }
-                )
-                withContext(Dispatchers.Main) {
-                    if (selectedSource != null) {
-                        bottomSheet.setMigrationManga(mangaItems[selectedSource])
-                    } else {
-                        bottomSheet.setMigrationSources(sourceItems)
-                    }
-                }
-            }
+            val migrationJob = async { firstTimeMigration() }
             listOf(migrationJob, extensionJob).awaitAll()
         }
         presenterScope.launch {
-            extensionManager.downloadRelay
+            extensionManager.downloadSharedFlow
                 .collect {
-                    if (it.first.startsWith("Finished")) {
-                        firstLoad = true
-                        currentDownloads.clear()
+                    if (it.first.startsWith("Finished") || it.first.startsWith("Uninstalled")) {
+                        if (it.first.startsWith("Finished")) {
+                            firstLoad = true
+                            currentDownloads.clear()
+                        }
                         extensions = toItems(
                             Triple(
-                                extensionManager.installedExtensions,
-                                extensionManager.untrustedExtensions,
-                                extensionManager.availableExtensions
-                            )
+                                extensionManager.installedExtensionsFlow.value,
+                                extensionManager.untrustedExtensionsFlow.value,
+                                extensionManager.availableExtensionsFlow.value,
+                            ),
                         )
-                        withUIContext { bottomSheet.setExtensions(extensions) }
+                        withUIContext { view?.setExtensions(extensions) }
                         return@collect
                     }
                     val extension = extensions.find { item ->
@@ -124,59 +80,28 @@ class ExtensionBottomPresenter(
                     }
                     val item = updateInstallStep(extension.extension, it.second.first, it.second.second)
                     if (item != null) {
-                        withUIContext { bottomSheet.downloadUpdate(item) }
+                        withUIContext { view?.downloadUpdate(item) }
                     }
                 }
         }
-    }
-
-    private fun findSourcesWithManga(library: List<Manga>): List<SourceItem> {
-        val header = SelectionHeader()
-        return library.map { it.source }.toSet()
-            .mapNotNull { if (it != LocalSource.ID) sourceManager.getOrStub(it) else null }
-            .sortedBy { it.name }
-            .map { SourceItem(it, header) }
-    }
-
-    private fun libraryToMigrationItem(library: List<Manga>, sourceId: Long): List<MangaItem> {
-        return library.filter { it.source == sourceId }.map(::MangaItem)
     }
 
     fun refreshExtensions() {
         presenterScope.launch {
             extensions = toItems(
                 Triple(
-                    extensionManager.installedExtensions,
-                    extensionManager.untrustedExtensions,
-                    extensionManager.availableExtensions
-                )
+                    extensionManager.installedExtensionsFlow.value,
+                    extensionManager.untrustedExtensionsFlow.value,
+                    extensionManager.availableExtensionsFlow.value,
+                ),
             )
-            withContext(Dispatchers.Main) { bottomSheet.setExtensions(extensions) }
-        }
-    }
-
-    fun refreshMigrations() {
-        presenterScope.launch {
-            val favs = db.getFavoriteMangas().executeOnIO()
-            sourceItems = findSourcesWithManga(favs)
-            mangaItems = HashMap(
-                sourceItems.associate {
-                    it.source.id to this@ExtensionBottomPresenter.libraryToMigrationItem(favs, it.source.id)
-                }
-            )
-            withContext(Dispatchers.Main) {
-                if (selectedSource != null) {
-                    bottomSheet.setMigrationManga(mangaItems[selectedSource])
-                } else {
-                    bottomSheet.setMigrationSources(sourceItems)
-                }
-            }
+            withContext(Dispatchers.Main) { view?.setExtensions(extensions, false) }
         }
     }
 
     @Synchronized
     private fun toItems(tuple: ExtensionTuple): List<ExtensionItem> {
-        val context = bottomSheet.context
+        val context = view?.context ?: return emptyList()
         val activeLangs = preferences.enabledLanguages().get()
         val showNsfwSources = preferences.showNsfwSources().get()
 
@@ -203,13 +128,13 @@ class ExtensionBottomPresenter(
                     {
                         when (sortOrder) {
                             InstalledExtensionsOrder.Name -> it.name
-                            InstalledExtensionsOrder.RecentlyUpdated -> Long.MAX_VALUE - extensionUpdateDate(it.pkgName)
-                            InstalledExtensionsOrder.RecentlyInstalled -> Long.MAX_VALUE - extensionInstallDate(it.pkgName)
+                            InstalledExtensionsOrder.RecentlyUpdated -> Long.MAX_VALUE - ExtensionLoader.extensionUpdateDate(context, it)
+                            InstalledExtensionsOrder.RecentlyInstalled -> Long.MAX_VALUE - ExtensionLoader.extensionInstallDate(context, it)
                             InstalledExtensionsOrder.Language -> it.lang
                         }
                     },
-                    { it.name }
-                )
+                    { it.name },
+                ),
             )
         val untrustedSorted = untrusted.sortedBy { it.name }
         val availableSorted = available
@@ -227,10 +152,10 @@ class ExtensionBottomPresenter(
                 context.resources.getQuantityString(
                     R.plurals._updates_pending,
                     updatesSorted.size,
-                    updatesSorted.size
+                    updatesSorted.size,
                 ),
                 updatesSorted.size,
-                items.count { it.extension.pkgName in currentDownloads.keys } != updatesSorted.size
+                items.count { it.extension.pkgName in currentDownloads.keys } != updatesSorted.size,
             )
             items += updatesSorted.map { extension ->
                 ExtensionItem(extension, header, currentDownloads[extension.pkgName])
@@ -263,31 +188,13 @@ class ExtensionBottomPresenter(
         return items
     }
 
-    private fun extensionInstallDate(pkgName: String): Long {
-        val context = bottomSheet.context
-        return try {
-            context.packageManager.getPackageInfo(pkgName, 0).firstInstallTime
-        } catch (e: java.lang.Exception) {
-            0
-        }
-    }
-
-    private fun extensionUpdateDate(pkgName: String): Long {
-        val context = bottomSheet.context
-        return try {
-            context.packageManager.getPackageInfo(pkgName, 0).lastUpdateTime
-        } catch (e: java.lang.Exception) {
-            0
-        }
-    }
-
     fun getExtensionUpdateCount(): Int = preferences.extensionUpdatesCount().get()
 
     @Synchronized
     private fun updateInstallStep(
         extension: Extension,
         state: InstallStep?,
-        session: PackageInstaller.SessionInfo?
+        session: PackageInstaller.SessionInfo?,
     ): ExtensionItem? {
         val extensions = extensions.toMutableList()
         val position = extensions.indexOfFirst { it.extension.pkgName == extension.pkgName }
@@ -295,7 +202,7 @@ class ExtensionBottomPresenter(
         return if (position != -1) {
             val item = extensions[position].copy(
                 installStep = state,
-                session = session
+                session = session,
             )
             extensions[position] = item
 
@@ -315,34 +222,46 @@ class ExtensionBottomPresenter(
         presenterScope.launch {
             extensionManager.installExtension(
                 ExtensionManager.ExtensionInfo(extension),
-                presenterScope
+                presenterScope,
             )
-                .launchIn(this)
+                .collect {
+                    when (it.first) {
+                        InstallStep.Installed, InstallStep.Error -> {
+                            currentDownloads.remove(extension.pkgName)
+                        }
+                        else -> {
+                            currentDownloads[extension.pkgName] = it
+                        }
+                    }
+                    val item = updateInstallStep(extension, it.first, it.second)
+                    if (item != null) {
+                        withUIContext { view?.downloadUpdate(item) }
+                    }
+                }
         }
     }
 
     fun updateExtension(extension: Extension.Installed) {
         val availableExt =
-            extensionManager.availableExtensions.find { it.pkgName == extension.pkgName } ?: return
+            extensionManager.availableExtensionsFlow.value.find { it.pkgName == extension.pkgName } ?: return
         installExtension(availableExt)
     }
 
     fun updateExtensions(extensions: List<Extension.Installed>) {
         if (extensions.isEmpty()) return
-        val context = bottomSheet.context
+        val context = view?.context ?: return
         extensions.forEach {
             val pkgName = it.pkgName
             currentDownloads[pkgName] = InstallStep.Pending to null
             val item = updateInstallStep(it, InstallStep.Pending, null) ?: return@forEach
-            bottomSheet.downloadUpdate(item)
+            view?.downloadUpdate(item)
         }
-        val intent = ExtensionInstallService.jobIntent(
-            bottomSheet.context,
+        ExtensionInstallerJob.start(
+            context,
             extensions.mapNotNull { extension ->
-                extensionManager.availableExtensions.find { it.pkgName == extension.pkgName }
-            }
+                extensionManager.availableExtensionsFlow.value.find { it.pkgName == extension.pkgName }
+            },
         )
-        ContextCompat.startForegroundService(context, intent)
     }
 
     fun uninstallExtension(pkgName: String) {
@@ -350,24 +269,12 @@ class ExtensionBottomPresenter(
     }
 
     fun findAvailableExtensions() {
-        extensionManager.findAvailableExtensions()
-    }
-
-    fun trustSignature(signatureHash: String) {
-        extensionManager.trustSignature(signatureHash)
-    }
-
-    fun setSelectedSource(source: Source) {
-        selectedSource = source.id
         presenterScope.launch {
-            withContext(Dispatchers.Main) { bottomSheet.setMigrationManga(mangaItems[source.id]) }
+            extensionManager.findAvailableExtensions()
         }
     }
 
-    fun deselectSource() {
-        selectedSource = null
-        presenterScope.launch {
-            withContext(Dispatchers.Main) { bottomSheet.setMigrationSources(sourceItems) }
-        }
+    fun trustExtension(pkgName: String, versionCode: Long, signatureHash: String) {
+        extensionManager.trust(pkgName, versionCode, signatureHash)
     }
 }

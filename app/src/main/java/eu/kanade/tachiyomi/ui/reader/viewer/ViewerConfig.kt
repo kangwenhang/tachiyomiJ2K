@@ -1,6 +1,6 @@
 package eu.kanade.tachiyomi.ui.reader.viewer
 
-import com.tfcporciuncula.flow.Preference
+import com.fredporciuncula.flow.preferences.Preference
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
@@ -17,7 +17,6 @@ abstract class ViewerConfig(preferences: PreferencesHelper, protected val scope:
     var navigationModeChangedListener: (() -> Unit)? = null
     var navigationModeInvertedListener: (() -> Unit)? = null
 
-    var tappingEnabled = true
     var longTapEnabled = true
     var tappingInverted = ViewerNavigation.TappingInvertMode.NONE
     var doubleTapAnimDuration = 500
@@ -33,9 +32,6 @@ abstract class ViewerConfig(preferences: PreferencesHelper, protected val scope:
         protected set
 
     init {
-        preferences.readWithTapping()
-            .register({ tappingEnabled = it })
-
         preferences.readWithLongTap()
             .register({ longTapEnabled = it })
 
@@ -54,7 +50,7 @@ abstract class ViewerConfig(preferences: PreferencesHelper, protected val scope:
 
     fun <T> Preference<T>.register(
         valueAssignment: (T) -> Unit,
-        onChanged: (T) -> Unit = {}
+        onChanged: (T) -> Unit = {},
     ) {
         asFlow()
             .onEach {

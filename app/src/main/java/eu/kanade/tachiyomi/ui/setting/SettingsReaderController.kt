@@ -1,12 +1,17 @@
 package eu.kanade.tachiyomi.ui.setting
 
+import android.hardware.display.DisplayManager
 import android.os.Build
+import android.view.Display
+import androidx.core.content.getSystemService
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.preference.PreferenceValues
 import eu.kanade.tachiyomi.data.preference.asImmediateFlow
 import eu.kanade.tachiyomi.data.preference.asImmediateFlowIn
 import eu.kanade.tachiyomi.ui.reader.settings.OrientationType
 import eu.kanade.tachiyomi.ui.reader.settings.PageLayout
+import eu.kanade.tachiyomi.ui.reader.settings.ReaderBackgroundColor
 import eu.kanade.tachiyomi.ui.reader.settings.ReaderBottomButton
 import eu.kanade.tachiyomi.ui.reader.settings.ReadingModeType
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation
@@ -26,9 +31,9 @@ class SettingsReaderController : SettingsController() {
             intListPreference(activity) {
                 key = Keys.defaultReadingMode
                 titleRes = R.string.default_reading_mode
-                entriesRes = ReadingModeType.values().drop(1)
+                entriesRes = ReadingModeType.entries.drop(1)
                     .map { value -> value.stringRes }.toTypedArray()
-                entryValues = ReadingModeType.values().drop(1)
+                entryValues = ReadingModeType.entries.drop(1)
                     .map { value -> value.flagValue }
                 defaultValue = 2
             }
@@ -38,9 +43,9 @@ class SettingsReaderController : SettingsController() {
                 entries = listOf(
                     context.getString(R.string.no_animation),
                     context.getString(
-                        R.string.fast
+                        R.string.fast,
                     ),
-                    context.getString(R.string.normal)
+                    context.getString(R.string.normal),
                 )
                 entryValues = listOf(1, 250, 500) // using a value of 0 breaks the image viewer, so
                 // min is 1
@@ -70,8 +75,8 @@ class SettingsReaderController : SettingsController() {
             multiSelectListPreferenceMat(activity) {
                 key = Keys.readerBottomButtons
                 titleRes = R.string.display_buttons_bottom_reader
-                val enumConstants = ReaderBottomButton.values()
-                entriesRes = ReaderBottomButton.values().map { it.stringRes }.toTypedArray()
+                val enumConstants = ReaderBottomButton.entries
+                entriesRes = ReaderBottomButton.entries.map { it.stringRes }.toTypedArray()
                 entryValues = enumConstants.map { it.value }
                 allSelectionRes = R.string.display_options
                 allIsAlwaysSelected = true
@@ -91,23 +96,18 @@ class SettingsReaderController : SettingsController() {
             intListPreference(activity) {
                 key = Keys.defaultOrientationType
                 titleRes = R.string.default_orientation
-                val enumConstants = OrientationType.values().drop(1)
+                val enumConstants = OrientationType.entries.drop(1)
                 entriesRes = enumConstants.map { it.stringRes }.toTypedArray()
-                entryValues = OrientationType.values().drop(1)
-                    .map { value -> value.flagValue }
+                entryValues = enumConstants.map { value -> value.flagValue }
                 defaultValue = OrientationType.FREE.flagValue
             }
             intListPreference(activity) {
                 key = Keys.readerTheme
                 titleRes = R.string.background_color
-                entriesRes = arrayOf(
-                    R.string.white,
-                    R.string.black,
-                    R.string.smart_based_on_page,
-                    R.string.smart_based_on_page_and_theme
-                )
-                entryRange = 0..3
-                defaultValue = 2
+                val enumConstants = ReaderBackgroundColor.entries
+                entriesRes = enumConstants.map { it.longStringRes ?: it.stringRes }.toTypedArray()
+                entryValues = enumConstants.map { it.prefValue }
+                defaultValue = ReaderBackgroundColor.SMART_PAGE.prefValue
             }
             switchPreference {
                 key = Keys.fullscreen
@@ -123,6 +123,22 @@ class SettingsReaderController : SettingsController() {
                 key = Keys.showPageNumber
                 titleRes = R.string.show_page_number
                 defaultValue = true
+            }
+            intListPreference(activity) {
+                bindTo(preferences.landscapeCutoutBehavior())
+                title = "${context.getString(R.string.cutout_area_behavior)} (${context.getString(R.string.landscape)})"
+                entriesRes = arrayOf(
+                    R.string.pad_cutout_areas,
+                    R.string.ignore_cutout_areas,
+                )
+                entryRange = 0..1
+                defaultValue = 0
+                isVisible = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    activity?.getSystemService<DisplayManager>()
+                        ?.getDisplay(Display.DEFAULT_DISPLAY)?.cutout != null
+                } else {
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                }
             }
         }
 
@@ -140,6 +156,10 @@ class SettingsReaderController : SettingsController() {
                 defaultValue = true
             }
             switchPreference {
+                bindTo(preferences.skipDupe())
+                titleRes = R.string.skip_dupe_chapters
+            }
+            switchPreference {
                 key = Keys.alwaysShowChapterTransition
                 titleRes = R.string.always_show_chapter_transition
                 summaryRes = R.string.if_disabled_transition_will_skip
@@ -152,13 +172,11 @@ class SettingsReaderController : SettingsController() {
 
             intListPreference(activity) {
                 key = Keys.navigationModePager
-                titleRes = R.string.nav_layout
+                titleRes = R.string.tap_zones
                 entries = context.resources.getStringArray(R.array.reader_nav).also { values ->
                     entryRange = 0..values.size
                 }.toList()
                 defaultValue = "0"
-
-                preferences.readWithTapping().asImmediateFlow { isVisible = it }.launchIn(viewScope)
             }
             listPreference(activity) {
                 key = Keys.pagerNavInverted
@@ -167,17 +185,15 @@ class SettingsReaderController : SettingsController() {
                     R.string.none,
                     R.string.horizontally,
                     R.string.vertically,
-                    R.string.both_axes
+                    R.string.both_axes,
                 )
                 entryValues = listOf(
                     ViewerNavigation.TappingInvertMode.NONE.name,
                     ViewerNavigation.TappingInvertMode.HORIZONTAL.name,
                     ViewerNavigation.TappingInvertMode.VERTICAL.name,
-                    ViewerNavigation.TappingInvertMode.BOTH.name
+                    ViewerNavigation.TappingInvertMode.BOTH.name,
                 )
                 defaultValue = ViewerNavigation.TappingInvertMode.NONE.name
-
-                preferences.readWithTapping().asImmediateFlow { isVisible = it }.launchIn(viewScope)
             }
 
             intListPreference(activity) {
@@ -189,7 +205,7 @@ class SettingsReaderController : SettingsController() {
                     R.string.fit_width,
                     R.string.fit_height,
                     R.string.original_size,
-                    R.string.smart_fit
+                    R.string.smart_fit,
                 )
                 entryRange = 1..6
                 defaultValue = 1
@@ -225,7 +241,11 @@ class SettingsReaderController : SettingsController() {
                     }
                 }
             }
-
+            switchPreference {
+                bindTo(preferences.landscapeZoom())
+                titleRes = R.string.zoom_double_page_spreads
+                visibleIf(preferences.imageScaleType()) { it == 1 }
+            }
             intListPreference(activity) {
                 key = Keys.zoomStart
                 titleRes = R.string.zoom_start_position
@@ -233,7 +253,7 @@ class SettingsReaderController : SettingsController() {
                     R.string.automatic,
                     R.string.left,
                     R.string.right,
-                    R.string.center
+                    R.string.center,
                 )
                 entryRange = 1..4
                 defaultValue = 1
@@ -243,11 +263,15 @@ class SettingsReaderController : SettingsController() {
                 titleRes = R.string.crop_borders
                 defaultValue = false
             }
+            switchPreference {
+                bindTo(preferences.navigateToPan())
+                titleRes = R.string.navigate_pan
+            }
             intListPreference(activity) {
                 key = Keys.pageLayout
                 title = context.getString(R.string.page_layout).addBetaTag(context)
                 dialogTitleRes = R.string.page_layout
-                val enumConstants = PageLayout.values()
+                val enumConstants = PageLayout.entries
                 entriesRes = enumConstants.map { it.fullStringRes }.toTypedArray()
                 entryValues = enumConstants.map { it.value }
                 defaultValue = PageLayout.AUTOMATIC.value
@@ -273,13 +297,11 @@ class SettingsReaderController : SettingsController() {
 
             intListPreference(activity) {
                 key = Keys.navigationModeWebtoon
-                titleRes = R.string.nav_layout
+                titleRes = R.string.tap_zones
                 entries = context.resources.getStringArray(R.array.reader_nav).also { values ->
                     entryRange = 0..values.size
                 }.toList()
                 defaultValue = "0"
-
-                preferences.readWithTapping().asImmediateFlow { isVisible = it }.launchIn(viewScope)
             }
             listPreference(activity) {
                 key = Keys.webtoonNavInverted
@@ -288,19 +310,23 @@ class SettingsReaderController : SettingsController() {
                     R.string.none,
                     R.string.horizontally,
                     R.string.vertically,
-                    R.string.both_axes
+                    R.string.both_axes,
                 )
                 entryValues = listOf(
                     ViewerNavigation.TappingInvertMode.NONE.name,
                     ViewerNavigation.TappingInvertMode.HORIZONTAL.name,
                     ViewerNavigation.TappingInvertMode.VERTICAL.name,
-                    ViewerNavigation.TappingInvertMode.BOTH.name
+                    ViewerNavigation.TappingInvertMode.BOTH.name,
                 )
                 defaultValue = ViewerNavigation.TappingInvertMode.NONE.name
-
-                preferences.readWithTapping().asImmediateFlow { isVisible = it }.launchIn(viewScope)
             }
-
+            listPreference(activity) {
+                bindTo(preferences.webtoonReaderHideThreshold())
+                titleRes = R.string.pref_hide_threshold
+                val enumValues = PreferenceValues.ReaderHideThreshold.entries
+                entriesRes = enumValues.map { it.titleResId }.toTypedArray()
+                entryValues = enumValues.map { it.name }
+            }
             switchPreference {
                 key = Keys.cropBordersWebtoon
                 titleRes = R.string.crop_borders
@@ -312,12 +338,13 @@ class SettingsReaderController : SettingsController() {
                 titleRes = R.string.pref_webtoon_side_padding
                 entriesRes = arrayOf(
                     R.string.webtoon_side_padding_0,
+                    R.string.webtoon_side_padding_5,
                     R.string.webtoon_side_padding_10,
                     R.string.webtoon_side_padding_15,
                     R.string.webtoon_side_padding_20,
-                    R.string.webtoon_side_padding_25
+                    R.string.webtoon_side_padding_25,
                 )
-                entryValues = listOf(0, 10, 15, 20, 25)
+                entryValues = listOf(0, 5, 10, 15, 20, 25)
                 defaultValue = "0"
             }
 
@@ -347,11 +374,6 @@ class SettingsReaderController : SettingsController() {
             titleRes = R.string.navigation
 
             switchPreference {
-                key = Keys.readWithTapping
-                titleRes = R.string.tapping
-                defaultValue = true
-            }
-            switchPreference {
                 key = Keys.readWithVolumeKeys
                 titleRes = R.string.volume_keys
                 defaultValue = false
@@ -374,10 +396,9 @@ class SettingsReaderController : SettingsController() {
                 defaultValue = true
             }
             switchPreference {
-                key = Keys.folderPerManga
+                bindTo(preferences.folderPerManga())
                 titleRes = R.string.save_pages_separately
                 summaryRes = R.string.create_folders_by_manga_title
-                defaultValue = false
             }
         }
     }

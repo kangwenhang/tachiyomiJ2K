@@ -7,15 +7,25 @@ import androidx.core.widget.TextViewCompat
 import androidx.vectordrawable.graphics.drawable.VectorDrawableCompat
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.Chapter
+import eu.kanade.tachiyomi.data.database.models.Manga
+import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.ui.manga.chapter.ChapterItem
 import eu.kanade.tachiyomi.util.system.contextCompatColor
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.dpToPxEnd
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.timeSpanFromNow
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 
 class ChapterUtil {
     companion object {
+
+        private val decimalFormat = DecimalFormat(
+            "#.###",
+            DecimalFormatSymbols()
+                .apply { decimalSeparator = '.' },
+        )
 
         fun relativeDate(chapter: Chapter): String? {
             return when (chapter.date_upload > 0) {
@@ -28,7 +38,7 @@ class ChapterUtil {
             textView: TextView,
             chapter: Chapter,
             showBookmark: Boolean = true,
-            hideStatus: Boolean = false
+            hideStatus: Boolean = false,
         ) {
             val context = textView.context
             textView.setTextColor(chapterColor(context, chapter, hideStatus))
@@ -43,21 +53,21 @@ class ChapterUtil {
                 val drawable = VectorDrawableCompat.create(
                     textView.resources,
                     R.drawable.ic_bookmark_24dp,
-                    context.theme
+                    context.theme,
                 )
                 drawable?.setBounds(0, 0, textView.textSize.toInt(), textView.textSize.toInt())
                 textView.setCompoundDrawablesRelative(
                     drawable,
                     null,
                     null,
-                    null
+                    null,
                 )
                 TextViewCompat.setCompoundDrawableTintList(
                     textView,
-                    ColorStateList.valueOf(bookmarkedColor(context))
+                    ColorStateList.valueOf(bookmarkedColor(context)),
                 )
                 textView.compoundDrawablePadding = 3.dpToPx
-                textView.translationX = (-2f).dpToPxEnd
+                textView.translationX = (-2f).dpToPxEnd(textView.resources)
             } else {
                 textView.setCompoundDrawablesRelative(null, null, null, null)
                 textView.translationX = 0f
@@ -143,7 +153,7 @@ class ChapterUtil {
             return chapters.size > 20
         }
 
-        private const val scanlatorSeparator = " & "
+        const val scanlatorSeparator = " & "
 
         fun getScanlators(scanlators: String?): List<String> {
             if (scanlators.isNullOrBlank()) return emptyList()
@@ -152,6 +162,15 @@ class ChapterUtil {
 
         fun getScanlatorString(scanlators: Set<String>): String {
             return scanlators.toList().sorted().joinToString(scanlatorSeparator)
+        }
+
+        fun Chapter.preferredChapterName(context: Context, manga: Manga, preferences: PreferencesHelper): String {
+            return if (manga.hideChapterTitle(preferences) && isRecognizedNumber) {
+                val number = decimalFormat.format(chapter_number.toDouble())
+                context.getString(R.string.chapter_, number)
+            } else {
+                name
+            }
         }
     }
 }

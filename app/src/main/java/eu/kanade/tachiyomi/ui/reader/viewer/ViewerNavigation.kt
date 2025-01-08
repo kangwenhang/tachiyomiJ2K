@@ -17,18 +17,20 @@ abstract class ViewerNavigation {
         fun directionalRegion(LTR: Boolean): NavigationRegion {
             return if (this === LEFT || this === RIGHT) {
                 if (if (LTR) this === RIGHT else this === LEFT) NEXT else PREV
-            } else this
+            } else {
+                this
+            }
         }
     }
 
     data class Region(
         val rectF: RectF,
-        val type: NavigationRegion
+        val type: NavigationRegion,
     ) {
         fun invert(invertMode: TappingInvertMode): Region {
             if (invertMode == TappingInvertMode.NONE) return this
             return this.copy(
-                rectF = this.rectF.invert(invertMode)
+                rectF = this.rectF.invert(invertMode),
             )
         }
     }
@@ -55,7 +57,7 @@ abstract class ViewerNavigation {
         NONE,
         HORIZONTAL(shouldInvertHorizontal = true),
         VERTICAL(shouldInvertVertical = true),
-        BOTH(shouldInvertHorizontal = true, shouldInvertVertical = true)
+        BOTH(shouldInvertHorizontal = true, shouldInvertVertical = true),
     }
 }
 

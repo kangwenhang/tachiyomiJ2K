@@ -3,50 +3,64 @@ package eu.kanade.tachiyomi.ui.base
 import android.content.Context
 import android.util.AttributeSet
 import android.view.MotionEvent
-import androidx.core.view.ViewCompat
 import androidx.core.view.marginTop
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import eu.davidea.fastscroller.FastScroller
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.ui.base.controller.BaseController
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.dpToPxEnd
 import eu.kanade.tachiyomi.util.system.isLTR
 import kotlin.math.abs
 
-class MaterialFastScroll @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
+@Suppress("LeakingThis")
+open class MaterialFastScroll @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     FastScroller(context, attrs) {
 
     var canScroll = false
-    var startY = 0f
+    var startY = -1f
     var scrollOffset = 0
+    var controller: BaseController<*>? = null
     init {
         setViewsToUse(
             R.layout.material_fastscroll,
             R.id.fast_scroller_bubble,
-            R.id.fast_scroller_handle
+            R.id.fast_scroller_handle,
         )
         autoHideEnabled = true
         ignoreTouchesOutsideHandle = false
         updateScrollListener()
     }
 
+    val isFastScrolling: Boolean
+        get() = handle.isSelected
+
     // Overriding to force a distance moved before scrolling
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (recyclerView.computeVerticalScrollRange() <= recyclerView.computeVerticalScrollExtent()) {
-            return super.onTouchEvent(event)
+        if (controller?.isDragging == true ||
+            recyclerView.computeVerticalScrollRange() <= recyclerView.computeVerticalScrollExtent()
+        ) {
+            return if (startY > -1f || controller?.isDragging == true) {
+                dispatchTouchToRecycler(event)
+                false
+            } else {
+                super.onTouchEvent(event)
+            }
         }
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 if (
                     if (context.resources.isLTR) {
-                        event.x < handle.x - ViewCompat.getPaddingStart(handle)
+                        event.x < handle.x - handle.paddingStart
                     } else {
-                        event.x > handle.width + ViewCompat.getPaddingStart(handle)
+                        event.x > handle.width + handle.paddingStart
                     }
-                ) return false
+                ) {
+                    return false
+                }
                 val y = event.y
                 startY = event.y
                 if (canScroll) {
@@ -56,7 +70,9 @@ class MaterialFastScroll @JvmOverloads constructor(context: Context, attrs: Attr
                     showScrollbar()
                     setBubbleAndHandlePosition(y)
                     setRecyclerViewPosition(y)
+                    return true
                 }
+                dispatchTouchToRecycler(event)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -67,6 +83,7 @@ class MaterialFastScroll @JvmOverloads constructor(context: Context, attrs: Attr
                     notifyScrollStateChange(true)
                     showBubble()
                     showScrollbar()
+                    dispatchTouchToRecycler(event) { action = MotionEvent.ACTION_CANCEL }
                 }
                 if (canScroll) {
                     setBubbleAndHandlePosition(y)
@@ -75,18 +92,29 @@ class MaterialFastScroll @JvmOverloads constructor(context: Context, attrs: Attr
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                startY = 0f
+                startY = -1f
+                if (!canScroll) {
+                    dispatchTouchToRecycler(event)
+                }
                 canScroll = false
             }
         }
         return super.onTouchEvent(event)
     }
 
+    private fun dispatchTouchToRecycler(event: MotionEvent, block: (MotionEvent.() -> Unit)? = null) {
+        val ev2 = MotionEvent.obtain(event)
+        ev2.offsetLocation(this.x, this.y)
+        block?.invoke(ev2)
+        recyclerView.dispatchTouchEvent(ev2)
+        ev2.recycle()
+    }
+
     override fun setBubbleAndHandlePosition(y: Float) {
         super.setBubbleAndHandlePosition(y)
         if (bubbleEnabled) {
             bubble.y = handle.y - bubble.height / 2f + handle.height / 2f
-            bubble.translationX = (-45f).dpToPxEnd
+            bubble.translationX = (-45f).dpToPxEnd(resources)
         }
     }
 
@@ -96,12 +124,12 @@ class MaterialFastScroll @JvmOverloads constructor(context: Context, attrs: Attr
             if (layoutManager is StaggeredGridLayoutManager) {
                 (layoutManager as StaggeredGridLayoutManager).scrollToPositionWithOffset(
                     targetPos,
-                    scrollOffset
+                    scrollOffset,
                 )
             } else {
                 (layoutManager as LinearLayoutManager).scrollToPositionWithOffset(
                     targetPos,
-                    scrollOffset
+                    scrollOffset,
                 )
             }
             updateBubbleText(targetPos)

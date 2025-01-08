@@ -5,11 +5,18 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.database.models.Category
 import eu.kanade.tachiyomi.data.library.LibraryUpdateJob
+import eu.kanade.tachiyomi.data.preference.DEVICE_BATTERY_NOT_LOW
+import eu.kanade.tachiyomi.data.preference.DEVICE_CHARGING
+import eu.kanade.tachiyomi.data.preference.DEVICE_ONLY_ON_WIFI
 import eu.kanade.tachiyomi.data.preference.DelayedLibrarySuggestionsJob
+import eu.kanade.tachiyomi.data.preference.MANGA_HAS_UNREAD
+import eu.kanade.tachiyomi.data.preference.MANGA_NON_COMPLETED
+import eu.kanade.tachiyomi.data.preference.MANGA_NON_READ
 import eu.kanade.tachiyomi.data.preference.asImmediateFlowIn
 import eu.kanade.tachiyomi.ui.category.CategoryController
 import eu.kanade.tachiyomi.ui.library.LibraryPresenter
 import eu.kanade.tachiyomi.ui.library.display.TabbedLibraryDisplaySheet
+import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.util.system.launchIO
 import eu.kanade.tachiyomi.util.system.launchUI
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
@@ -81,17 +88,22 @@ class SettingsLibraryController : SettingsController() {
 
                 val categories = listOf(Category.createDefault(context)) + dbCategories
                 entries =
-                    listOf(context.getString(R.string.always_ask)) + categories.map { it.name }.toTypedArray()
-                entryValues = listOf(-1) + categories.mapNotNull { it.id }.toList()
-                defaultValue = "-1"
+                    listOf(context.getString(R.string.last_used), context.getString(R.string.always_ask)) +
+                        categories.map { it.name }.toTypedArray()
+                entryValues = listOf(-2, -1) + categories.mapNotNull { it.id }.toList()
+                defaultValue = "-2"
 
-                val selectedCategory = categories.find { it.id == preferences.defaultCategory() }
-                summary =
-                    selectedCategory?.name ?: context.getString(R.string.always_ask)
+                val categoryName: (Int) -> String = { catId ->
+                    when (catId) {
+                        -2 -> context.getString(R.string.last_used)
+                        -1 -> context.getString(R.string.always_ask)
+                        else -> categories.find { it.id == preferences.defaultCategory() }?.name
+                            ?: context.getString(R.string.last_used)
+                    }
+                }
+                summary = categoryName(preferences.defaultCategory())
                 onChange { newValue ->
-                    summary = categories.find {
-                        it.id == newValue as Int
-                    }?.name ?: context.getString(R.string.always_ask)
+                    summary = categoryName(newValue as Int)
                     true
                 }
             }
@@ -108,7 +120,7 @@ class SettingsLibraryController : SettingsController() {
                     R.string.daily,
                     R.string.every_2_days,
                     R.string.every_3_days,
-                    R.string.weekly
+                    R.string.weekly,
                 )
                 entryValues = listOf(0, 12, 24, 48, 72, 168)
                 defaultValue = 24
@@ -119,16 +131,17 @@ class SettingsLibraryController : SettingsController() {
 
                     val interval = newValue as Int
                     if (interval > 0) {
+                        (activity as? MainActivity)?.showNotificationPermissionPrompt(true)
                         LibraryUpdateJob.setupTask(context, interval)
                     }
                     true
                 }
             }
             multiSelectListPreferenceMat(activity) {
-                key = Keys.libraryUpdateRestriction
+                bindTo(preferences.libraryUpdateDeviceRestriction())
                 titleRes = R.string.library_update_restriction
-                entriesRes = arrayOf(R.string.wifi, R.string.charging)
-                entryValues = listOf("wifi", "ac")
+                entriesRes = arrayOf(R.string.wifi, R.string.charging, R.string.battery_not_low)
+                entryValues = listOf(DEVICE_ONLY_ON_WIFI, DEVICE_CHARGING, DEVICE_BATTERY_NOT_LOW)
                 preSummaryRes = R.string.restrictions_
                 noSelectionRes = R.string.none
 
@@ -142,29 +155,23 @@ class SettingsLibraryController : SettingsController() {
                     true
                 }
             }
-            switchPreference {
-                key = Keys.updateOnlyNonCompleted
-                titleRes = R.string.only_update_ongoing
-                defaultValue = false
-            }
 
-            intListPreference(activity) {
-                key = Keys.libraryUpdatePrioritization
-                titleRes = R.string.library_update_order
-
-                // The following array lines up with the list rankingScheme in:
-                // ../../data/library/LibraryUpdateRanker.kt
+            multiSelectListPreferenceMat(activity) {
+                bindTo(preferences.libraryUpdateMangaRestriction())
+                titleRes = R.string.pref_library_update_manga_restriction
                 entriesRes = arrayOf(
-                    R.string.alphabetically,
-                    R.string.last_updated
+                    R.string.pref_update_only_completely_read,
+                    R.string.pref_update_only_started,
+                    R.string.pref_update_only_non_completed,
                 )
-                entryRange = 0..1
-                defaultValue = 0
+                entryValues = listOf(MANGA_HAS_UNREAD, MANGA_NON_READ, MANGA_NON_COMPLETED)
+                noSelectionRes = R.string.none
             }
 
             triStateListPreference(activity) {
-                key = Keys.libraryUpdateCategories
-                excludeKey = Keys.libraryUpdateCategoriesExclude
+                preferences.apply {
+                    bindTo(libraryUpdateCategories(), libraryUpdateCategoriesExclude())
+                }
                 titleRes = R.string.categories
 
                 val categories = listOf(Category.createDefault(context)) + dbCategories
@@ -172,18 +179,6 @@ class SettingsLibraryController : SettingsController() {
                 entryValues = categories.map { it.id.toString() }
 
                 allSelectionRes = R.string.all
-            }
-
-            intListPreference(activity) {
-                key = Keys.updateOnRefresh
-                titleRes = R.string.categories_on_manual
-
-                entriesRes = arrayOf(
-                    R.string.first_category,
-                    R.string.categories_in_global_update
-                )
-                entryRange = 0..1
-                defaultValue = -1
             }
 
             switchPreference {

@@ -8,7 +8,7 @@ import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.ui.reader.settings.OrientationType
 import eu.kanade.tachiyomi.ui.reader.settings.ReadingModeType
-import tachiyomi.source.model.MangaInfo
+import eu.kanade.tachiyomi.util.manga.MangaCoverMetadata
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.Locale
@@ -95,7 +95,7 @@ interface Manga : SManga {
                 TYPE_MANHUA -> R.string.manhua
                 TYPE_COMIC -> R.string.comic
                 else -> R.string.manga
-            }
+            },
         ).lowercase(Locale.getDefault())
     }
 
@@ -132,7 +132,7 @@ interface Manga : SManga {
             TYPE_WEBTOON
         } else if (currentTags.any { tag -> isManhuaTag(tag) } || sourceName.contains(
                 "manhua",
-                true
+                true,
             )
         ) {
             TYPE_MANHUA
@@ -171,7 +171,9 @@ interface Manga : SManga {
             (sourceName.contains("manhua", true) && currentTags.none { tag -> isMangaTag(tag) })
         ) {
             ReadingModeType.LEFT_TO_RIGHT.flagValue
-        } else 0
+        } else {
+            0
+        }
     }
 
     fun isSeriesTag(tag: String): Boolean {
@@ -219,7 +221,8 @@ interface Manga : SManga {
             sourceName.contains("xkcd", true) ||
             sourceName.contains("tapas", true) ||
             sourceName.contains("ComicExtra", true) ||
-            sourceName.contains("Read Comics Online", true)
+            sourceName.contains("Read Comics Online", true) ||
+            sourceName.contains("ReadComicOnline", true)
     }
 
     fun isOneShotOrCompleted(db: DatabaseHelper): Boolean {
@@ -273,6 +276,13 @@ interface Manga : SManga {
         get() = vibrantCoverColorMap[id]
         set(value) {
             id?.let { vibrantCoverColorMap[it] = value }
+        }
+
+    var dominantCoverColors: Pair<Int, Int>?
+        get() = MangaCoverMetadata.getColors(this)
+        set(value) {
+            value ?: return
+            MangaCoverMetadata.addCoverColor(this, value.first, value.second)
         }
 
     companion object {
@@ -329,17 +339,4 @@ interface Manga : SManga {
             this.source = source
         }
     }
-}
-
-fun Manga.toMangaInfo(): MangaInfo {
-    return MangaInfo(
-        artist = this.artist ?: "",
-        author = this.author ?: "",
-        cover = this.thumbnail_url ?: "",
-        description = this.description ?: "",
-        genres = this.getGenres() ?: emptyList(),
-        key = this.url,
-        status = this.status,
-        title = this.title
-    )
 }

@@ -5,14 +5,15 @@
     android:id="@+id/download_button"
     android:clickable="true"
     android:focusable="true"
-    android:layout_width="30dp"
-    android:layout_height="30dp">
+    android:layout_width="32dp"
+    android:layout_height="32dp">
 
     <ImageView
         android:id="@+id/download_border"
         android:layout_width="30dp"
         android:layout_height="30dp"
         android:layout_gravity="center"
+        android:contentDescription="@string/download"
         android:src="@drawable/border_circle"
         android:padding="3dp"/>
 
@@ -43,8 +44,9 @@
         app:tint="?attr/colorSecondary"
         android:layout_gravity="center"
         android:layout_width="30dp"
+        android:contentDescription="@string/download"
         android:layout_height="30dp"
-        android:background="@drawable/round_ripple"
+        android:background="?selectableItemBackgroundBorderless"
         android:padding="5dp"
         android:src="@drawable/ic_arrow_downward_24dp" />
 </eu.kanade.tachiyomi.ui.download.DownloadButton>

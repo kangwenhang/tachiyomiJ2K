@@ -11,12 +11,14 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.preference.PreferenceKeys
 import eu.kanade.tachiyomi.data.preference.asImmediateFlowIn
-import eu.kanade.tachiyomi.data.updater.AutoAppUpdaterJob
+import eu.kanade.tachiyomi.data.updater.AppDownloadInstallJob
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.extension.ExtensionUpdateJob
+import eu.kanade.tachiyomi.extension.util.ExtensionInstaller
 import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.migration.MigrationController
+import eu.kanade.tachiyomi.ui.source.browse.repos.RepoController
 import eu.kanade.tachiyomi.util.view.snack
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
 import uy.kohesive.injekt.injectLazy
@@ -28,6 +30,13 @@ class SettingsBrowseController : SettingsController() {
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) = screen.apply {
         titleRes = R.string.browse
+
+        preferenceCategory {
+            switchPreference {
+                bindTo(preferences.hideInLibraryItems())
+                titleRes = R.string.hide_in_library_items
+            }
+        }
 
         preferenceCategory {
             titleRes = R.string.extensions
@@ -42,7 +51,16 @@ class SettingsBrowseController : SettingsController() {
                     true
                 }
             }
-            if (ExtensionManager.canAutoInstallUpdates(context)) {
+            preference {
+                key = "pref_edit_extension_repos"
+
+                val repoCount = preferences.extensionRepos().get().count()
+                titleRes = R.string.extension_repos
+                if (repoCount > 0) summary = context.resources.getQuantityString(R.plurals.num_repos, repoCount, repoCount)
+
+                onClick { router.pushController(RepoController().withFadeTransaction()) }
+            }
+            if (ExtensionManager.canAutoInstallUpdates()) {
                 val intPref = intListPreference(activity) {
                     key = PreferenceKeys.autoUpdateExtensions
                     titleRes = R.string.auto_update_extensions
@@ -50,11 +68,11 @@ class SettingsBrowseController : SettingsController() {
                     entriesRes = arrayOf(
                         R.string.over_any_network,
                         R.string.over_wifi_only,
-                        R.string.dont_auto_update
+                        R.string.dont_auto_update,
                     )
-                    defaultValue = AutoAppUpdaterJob.ONLY_ON_UNMETERED
+                    defaultValue = AppDownloadInstallJob.ONLY_ON_UNMETERED
                 }
-                val infoPref = if (!preferences.useShizukuForExtensions()) {
+                val infoPref = if (preferences.extensionInstaller().get() != ExtensionInstaller.SHIZUKU) {
                     infoPreference(R.string.some_extensions_may_not_update)
                 } else {
                     null
@@ -66,7 +84,7 @@ class SettingsBrowseController : SettingsController() {
                         titleRes = R.string.notify_extension_updated
                         isChecked = Notifications.isNotificationChannelEnabled(
                             context,
-                            Notifications.CHANNEL_EXT_UPDATED
+                            Notifications.CHANNEL_EXT_UPDATED,
                         )
                         updatedExtNotifPref = this
                         onChange {
@@ -78,7 +96,7 @@ class SettingsBrowseController : SettingsController() {
                                     putExtra(Settings.EXTRA_APP_PACKAGE, BuildConfig.APPLICATION_ID)
                                     putExtra(
                                         Settings.EXTRA_CHANNEL_ID,
-                                        Notifications.CHANNEL_EXT_UPDATED
+                                        Notifications.CHANNEL_EXT_UPDATED,
                                     )
                                 }
                             startActivity(intent)
@@ -130,12 +148,12 @@ class SettingsBrowseController : SettingsController() {
                     preferences.migrationSources().set(pinnedSources)
                     (activity as? MainActivity)?.setUndoSnackBar(
                         view?.snack(
-                            R.string.migration_sources_changed
+                            R.string.migration_sources_changed,
                         ) {
                             setAction(R.string.undo) {
                                 preferences.migrationSources().set(ogSources)
                             }
-                        }
+                        },
                     )
                 }
             }
@@ -156,12 +174,12 @@ class SettingsBrowseController : SettingsController() {
                     preferences.migrationSources().set(enabledSources)
                     (activity as? MainActivity)?.setUndoSnackBar(
                         view?.snack(
-                            R.string.migration_sources_changed
+                            R.string.migration_sources_changed,
                         ) {
                             setAction(R.string.undo) {
                                 preferences.migrationSources().set(ogSources)
                             }
-                        }
+                        },
                     )
                 }
             }

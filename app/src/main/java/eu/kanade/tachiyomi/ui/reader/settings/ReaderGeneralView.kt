@@ -15,9 +15,9 @@ class ReaderGeneralView @JvmOverloads constructor(context: Context, attrs: Attri
     override fun initGeneralPreferences() {
         binding.viewerSeries.onItemSelectedListener = { position ->
             val readingModeType = ReadingModeType.fromSpinner(position)
-            (context as ReaderActivity).presenter.setMangaReadingMode(readingModeType.flagValue)
+            (context as ReaderActivity).viewModel.setMangaReadingMode(readingModeType.flagValue)
 
-            val mangaViewer = activity.presenter.getMangaReadingMode()
+            val mangaViewer = activity.viewModel.getMangaReadingMode()
             if (mangaViewer == ReadingModeType.WEBTOON.flagValue || mangaViewer == ReadingModeType.CONTINUOUS_VERTICAL.flagValue) {
                 initWebtoonPreferences()
             } else {
@@ -25,21 +25,30 @@ class ReaderGeneralView @JvmOverloads constructor(context: Context, attrs: Attri
             }
         }
         binding.viewerSeries.setSelection(
-            (context as? ReaderActivity)?.presenter?.manga?.readingModeType?.let {
+            (context as? ReaderActivity)?.viewModel?.state?.value?.manga?.readingModeType?.let {
                 ReadingModeType.fromPreference(it).prefValue
-            } ?: 0
+            } ?: 0,
         )
         binding.rotationMode.onItemSelectedListener = { position ->
             val rotationType = OrientationType.fromSpinner(position)
-            (context as ReaderActivity).presenter.setMangaOrientationType(rotationType.flagValue)
+            (context as ReaderActivity).viewModel.setMangaOrientationType(rotationType.flagValue)
         }
         binding.rotationMode.setSelection(
-            (context as ReaderActivity).presenter.manga?.orientationType?.let {
+            (context as ReaderActivity).viewModel.manga?.orientationType?.let {
                 OrientationType.fromPreference(it).prefValue
-            } ?: 0
+            } ?: 0,
         )
 
-        binding.backgroundColor.bindToPreference(preferences.readerTheme(), 0)
+        binding.backgroundColor.setEntries(
+            ReaderBackgroundColor.entries
+                .map { context.getString(it.stringRes) },
+        )
+        val selection = ReaderBackgroundColor.indexFromPref(preferences.readerTheme().get())
+        binding.backgroundColor.setSelection(selection)
+        binding.backgroundColor.onItemSelectedListener = { position ->
+            val backgroundColor = ReaderBackgroundColor.entries[position]
+            preferences.readerTheme().set(backgroundColor.prefValue)
+        }
         binding.showPageNumber.bindToPreference(preferences.showPageNumber())
         binding.fullscreen.bindToPreference(preferences.fullscreen())
         binding.keepscreen.bindToPreference(preferences.keepScreenOn())

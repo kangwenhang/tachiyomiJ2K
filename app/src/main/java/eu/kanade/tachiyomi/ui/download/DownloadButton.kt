@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Color
 import android.util.AttributeSet
 import android.widget.FrameLayout
+import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
@@ -14,72 +15,44 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.databinding.DownloadButtonBinding
 import eu.kanade.tachiyomi.util.system.getResourceColor
-import eu.kanade.tachiyomi.widget.EndAnimatorListener
 
 class DownloadButton @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     FrameLayout(context, attrs) {
 
-    var colorSecondary = context.getResourceColor(R.attr.colorSecondary)
+    var accentColor = context.getResourceColor(R.attr.colorSecondary)
         set(value) {
             field = value
-            activeColor = ColorUtils.blendARGB(
-                colorSecondary,
-                context.getResourceColor(R.attr.background),
-                0.05f
-            )
-            downloadedColor = ColorUtils.blendARGB(
-                colorSecondary,
-                context.getResourceColor(R.attr.colorOnBackground),
-                0.3f
-            )
+            activeColor = ColorUtils.blendARGB(value, bgColor, 0.05f)
+            downloadedColor = ColorUtils.blendARGB(value, cOnBgColor, 0.3f)
         }
-    private var activeColor = ColorUtils.blendARGB(
-        colorSecondary,
-        context.getResourceColor(R.attr.background),
-        0.05f
-    )
-    private val progressBGColor = ContextCompat.getColor(
-        context,
-        R.color.divider
-    )
-    private val disabledColor = ContextCompat.getColor(
-        context,
-        R.color.material_on_surface_disabled
-    )
-    private var downloadedColor = ColorUtils.blendARGB(
-        colorSecondary,
-        context.getResourceColor(R.attr.colorOnBackground),
-        0.3f
-    )
+    private val bgColor = context.getResourceColor(R.attr.background)
+    private val cOnBgColor = context.getResourceColor(R.attr.colorOnBackground)
+    private var activeColor = ColorUtils.blendARGB(accentColor, bgColor, 0.05f)
+    private var downloadedColor = ColorUtils.blendARGB(accentColor, cOnBgColor, 0.3f)
+    private val progressBGColor by lazy { ContextCompat.getColor(context, R.color.divider) }
+    private val disabledColor by lazy {
+        ContextCompat.getColor(context, R.color.material_on_surface_disabled)
+    }
     private val downloadedTextColor = context.getResourceColor(R.attr.background)
-    private val errorColor = ContextCompat.getColor(
-        context,
-        R.color.material_red_500
-    )
-    private val filledCircle = ContextCompat.getDrawable(
-        context,
-        R.drawable.filled_circle
-    )?.mutate()
-    private val borderCircle = ContextCompat.getDrawable(
-        context,
-        R.drawable.border_circle
-    )?.mutate()
-    private val downloadDrawable = ContextCompat.getDrawable(
-        context,
-        R.drawable.ic_arrow_downward_24dp
-    )?.mutate()
-    private val checkDrawable = ContextCompat.getDrawable(
-        context,
-        R.drawable.ic_check_24dp
-    )?.mutate()
-    private val filledAnim = AnimatedVectorDrawableCompat.create(
-        context,
-        R.drawable.anim_outline_to_filled
-    )
-    private val checkAnim = AnimatedVectorDrawableCompat.create(
-        context,
-        R.drawable.anim_dl_to_check_to_dl
-    )
+    private val errorColor by lazy { ContextCompat.getColor(context, R.color.material_red_500) }
+    private val filledCircle by lazy {
+        ContextCompat.getDrawable(context, R.drawable.filled_circle)?.mutate()
+    }
+    private val borderCircle by lazy {
+        ContextCompat.getDrawable(context, R.drawable.border_circle)?.mutate()
+    }
+    private val downloadDrawable by lazy {
+        ContextCompat.getDrawable(context, R.drawable.ic_arrow_downward_24dp)?.mutate()
+    }
+    private val checkDrawable by lazy {
+        ContextCompat.getDrawable(context, R.drawable.ic_check_24dp)?.mutate()
+    }
+    private val filledAnim by lazy {
+        AnimatedVectorDrawableCompat.create(context, R.drawable.anim_outline_to_filled)
+    }
+    private val checkAnim by lazy {
+        AnimatedVectorDrawableCompat.create(context, R.drawable.anim_dl_to_check_to_dl)
+    }
     private var isAnimating = false
     private var iconAnimation: ObjectAnimator? = null
 
@@ -99,7 +72,9 @@ class DownloadButton @JvmOverloads constructor(context: Context, attrs: Attribut
         binding.downloadIcon.setImageDrawable(
             if (state == Download.State.CHECKED) {
                 checkDrawable
-            } else downloadDrawable
+            } else {
+                downloadDrawable
+            },
         )
         when (state) {
             Download.State.CHECKED -> {
@@ -158,12 +133,10 @@ class DownloadButton @JvmOverloads constructor(context: Context, attrs: Attribut
                     alphaAnimation.addUpdateListener { valueAnimator ->
                         binding.downloadIcon.drawable.setTint(valueAnimator.animatedValue as Int)
                     }
-                    alphaAnimation.addListener(
-                        EndAnimatorListener {
-                            binding.downloadIcon.drawable.setTint(downloadedTextColor)
-                            checkAnim?.start()
-                        }
-                    )
+                    alphaAnimation.doOnEnd {
+                        binding.downloadIcon.drawable.setTint(downloadedTextColor)
+                        checkAnim?.start()
+                    }
                     alphaAnimation.duration = 150
                     alphaAnimation.start()
                     binding.downloadBorder.drawable.setTint(downloadedColor)

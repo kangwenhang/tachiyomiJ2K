@@ -25,16 +25,12 @@ import androidx.core.view.isVisible
 import androidx.core.view.marginBottom
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
-import androidx.webkit.WebSettingsCompat.DARK_STRATEGY_WEB_THEME_DARKENING_ONLY
-import androidx.webkit.WebSettingsCompat.FORCE_DARK_OFF
-import androidx.webkit.WebSettingsCompat.FORCE_DARK_ON
-import androidx.webkit.WebSettingsCompat.setForceDark
-import androidx.webkit.WebSettingsCompat.setForceDarkStrategy
-import androidx.webkit.WebViewFeature
+import androidx.lifecycle.lifecycleScope
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.preference.asImmediateFlowIn
 import eu.kanade.tachiyomi.databinding.WebviewActivityBinding
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
-import eu.kanade.tachiyomi.util.system.ThemeUtil
+import eu.kanade.tachiyomi.ui.security.SecureActivityDelegate
 import eu.kanade.tachiyomi.util.system.getPrefTheme
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.isInNightMode
@@ -53,7 +49,7 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         binding.toolbar.setNavigationOnClickListener {
-            super.onBackPressed()
+            onBackPressedDispatcher.onBackPressed()
         }
         val tintColor = getResourceColor(R.attr.actionBarTintColor)
         binding.toolbar.navigationIcon?.setTint(tintColor)
@@ -75,7 +71,7 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
             // with horizontal insets
             v.updatePadding(
                 left = insets.getInsets(systemBars()).left,
-                right = insets.getInsets(systemBars()).right
+                right = insets.getInsets(systemBars()).right,
             )
             WindowInsetsCompat.Builder(insets).setInsets(
                 systemBars(),
@@ -83,8 +79,8 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
                     0,
                     insets.getInsets(systemBars()).top,
                     0,
-                    insets.getInsets(systemBars()).bottom
-                )
+                    insets.getInsets(systemBars()).bottom,
+                ),
             ).build()
         }
         binding.swipeRefresh.setStyle()
@@ -94,7 +90,7 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
 
         window.statusBarColor = ColorUtils.setAlphaComponent(
             getResourceColor(R.attr.colorSurface),
-            255
+            255,
         )
 
         ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
@@ -111,7 +107,7 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
                 insets.getInsets(systemBars()).left,
                 insets.getInsets(systemBars()).top,
                 insets.getInsets(systemBars()).right,
-                0
+                0,
             )
             if (!isInNightMode()) {
                 WindowInsetsControllerCompat(window, content).isAppearanceLightNavigationBars = true
@@ -119,7 +115,6 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
             insets
         }
 
-        setWebDarkMode()
         binding.swipeRefresh.isEnabled = false
 
         if (bundle == null) {
@@ -135,6 +130,11 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
                     }
                     super.onProgressChanged(view, newProgress)
                 }
+
+                override fun onReceivedTitle(view: WebView?, title: String?) {
+                    super.onReceivedTitle(view, title)
+                    this@BaseWebViewActivity.title = title
+                }
             }
             val marginB = binding.webview.marginBottom
             ViewCompat.setOnApplyWindowInsetsListener(binding.swipeRefresh) { v, insets ->
@@ -149,21 +149,11 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
                 binding.webview.restoreState(it)
             }
         }
-    }
 
-    private fun setWebDarkMode() {
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK_STRATEGY)) {
-            setForceDarkStrategy(
-                binding.webview.settings,
-                DARK_STRATEGY_WEB_THEME_DARKENING_ONLY
-            )
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                setForceDark(
-                    binding.webview.settings,
-                    if (isInNightMode()) FORCE_DARK_ON else FORCE_DARK_OFF
-                )
+        preferences.incognitoMode()
+            .asImmediateFlowIn(lifecycleScope) {
+                SecureActivityDelegate.setSecure(this)
             }
-        }
     }
 
     override fun onProvideAssistContent(outContent: AssistContent?) {
@@ -184,9 +174,6 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
         setTheme(prefTheme.styleRes)
         if (!lightMode && preferences.themeDarkAmoled().get()) {
             setTheme(R.style.ThemeOverlay_Tachiyomi_Amoled)
-            if (ThemeUtil.isColoredTheme(prefTheme)) {
-                setTheme(R.style.ThemeOverlay_Tachiyomi_AllBlue)
-            }
         }
         val themeValue = TypedValue()
         theme.resolveAttribute(android.R.attr.windowLightStatusBar, themeValue, true)
@@ -200,9 +187,8 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
                 R.attr.colorSurface,
                 R.attr.actionBarTintColor,
                 R.attr.colorPrimaryVariant,
-            )
+            ),
         )
-        setWebDarkMode()
         val colorSurface = attrs.getColor(0, 0)
         val actionBarTintColor = attrs.getColor(1, 0)
         val colorPrimaryVariant = attrs.getColor(2, 0)
@@ -211,8 +197,11 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
         window.statusBarColor = ColorUtils.setAlphaComponent(colorSurface, 255)
         binding.toolbar.setBackgroundColor(colorSurface)
         binding.toolbar.popupTheme =
-            if (lightMode) R.style.ThemeOverlay_Material3
-            else R.style.ThemeOverlay_Material3_Dark
+            if (lightMode) {
+                R.style.ThemeOverlay_Material3
+            } else {
+                R.style.ThemeOverlay_Material3_Dark
+            }
         binding.toolbar.setNavigationIconTint(actionBarTintColor)
         binding.toolbar.overflowIcon?.mutate()
         binding.toolbar.setTitleTextColor(actionBarTintColor)
@@ -221,14 +210,12 @@ open class BaseWebViewActivity : BaseActivity<WebviewActivityBinding>() {
         binding.swipeRefresh.setProgressBackgroundColorSchemeColor(colorPrimaryVariant)
 
         window.navigationBarColor =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O || !lightMode) colorPrimaryVariant
-            else Color.BLACK
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O || !lightMode) {
+                colorPrimaryVariant
+            } else {
+                Color.BLACK
+            }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
-    }
-
-    override fun onBackPressed() {
-        if (binding.webview.canGoBack()) binding.webview.goBack()
-        else super.onBackPressed()
     }
 }

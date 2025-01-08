@@ -3,10 +3,12 @@ package eu.kanade.tachiyomi.ui.download
 import android.view.View
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isVisible
+import androidx.recyclerview.widget.ItemTouchHelper
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.databinding.DownloadItemBinding
 import eu.kanade.tachiyomi.ui.base.holder.BaseFlexibleViewHolder
+import eu.kanade.tachiyomi.util.chapter.ChapterUtil.Companion.preferredChapterName
 import eu.kanade.tachiyomi.util.view.setVectorCompat
 
 /**
@@ -35,7 +37,8 @@ class DownloadHolder(private val view: View, val adapter: DownloadAdapter) :
     fun bind(download: Download) {
         this.download = download
         // Update the chapter name.
-        binding.chapterTitle.text = download.chapter.name
+        binding.chapterTitle.text = download.chapter
+            .preferredChapterName(itemView.context, download.manga, adapter.preferences)
 
         // Update the manga title
         binding.title.text = download.manga.title
@@ -54,7 +57,7 @@ class DownloadHolder(private val view: View, val adapter: DownloadAdapter) :
 
         binding.downloadMenu.setVectorCompat(
             R.drawable.ic_more_vert_24dp,
-            R.attr.colorOnBackground
+            R.attr.colorOnBackground,
         )
     }
 
@@ -77,9 +80,18 @@ class DownloadHolder(private val view: View, val adapter: DownloadAdapter) :
         binding.downloadProgressText.text = "${download.downloadedImages}/${pages.size}"
     }
 
+    override fun onActionStateChanged(position: Int, actionState: Int) {
+        super.onActionStateChanged(position, actionState)
+        if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+            binding.root.isDragged = true
+        }
+    }
+
     override fun onItemReleased(position: Int) {
         super.onItemReleased(position)
         adapter.downloadItemListener.onItemReleased(position)
+        binding.root.isDragged = false
+        binding.root.cardElevation = 0f
     }
 
     private fun showPopupMenu(view: View) {

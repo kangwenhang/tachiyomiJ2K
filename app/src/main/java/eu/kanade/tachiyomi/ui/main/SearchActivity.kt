@@ -7,12 +7,14 @@ import android.os.Bundle
 import androidx.core.view.isVisible
 import com.bluelinelabs.conductor.Controller
 import com.bluelinelabs.conductor.RouterTransaction
-import com.bluelinelabs.conductor.changehandler.FadeChangeHandler
 import com.bluelinelabs.conductor.changehandler.SimpleSwapChangeHandler
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
+import eu.kanade.tachiyomi.ui.base.SmallToolbarInterface
 import eu.kanade.tachiyomi.ui.base.controller.BaseController
 import eu.kanade.tachiyomi.ui.base.controller.DialogController
+import eu.kanade.tachiyomi.ui.base.controller.FadeChangeHandler
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsController
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.security.SecureActivityDelegate
@@ -21,44 +23,72 @@ import eu.kanade.tachiyomi.ui.setting.SettingsReaderController
 import eu.kanade.tachiyomi.ui.source.browse.BrowseSourceController
 import eu.kanade.tachiyomi.ui.source.globalsearch.GlobalSearchController
 import eu.kanade.tachiyomi.util.chapter.ChapterSort
+import eu.kanade.tachiyomi.util.system.extensionIntentForText
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 class SearchActivity : MainActivity() {
 
+    private var backToMain = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding.toolbar.navigationIcon = backDrawable
-        binding.cardToolbar.navigationIcon = backDrawable
         binding.toolbar.setNavigationOnClickListener { popToRoot() }
-        binding.cardToolbar.setNavigationOnClickListener { popToRoot() }
+        binding.searchToolbar.setNavigationOnClickListener {
+            val rootSearchController = router.backstack.lastOrNull()?.controller
+            if ((
+                rootSearchController is RootSearchInterface ||
+                    (currentToolbar != binding.searchToolbar && binding.appBar.useLargeToolbar)
+                ) && rootSearchController !is SmallToolbarInterface
+            ) {
+                binding.searchToolbar.menu.findItem(R.id.action_search)?.expandActionView()
+            } else {
+                popToRoot()
+            }
+        }
         (router.backstack.lastOrNull()?.controller as? BaseController<*>)?.setTitle()
         (router.backstack.lastOrNull()?.controller as? SettingsController)?.setTitle()
     }
 
-    override fun onBackPressed() {
+    // Override finishAfterTransition since the animation gets weird when launching this from other apps
+    override fun finishAfterTransition() {
+        if (backToMain) {
+            super.finishAfterTransition()
+        } else {
+            finish()
+        }
+    }
+
+    override fun backPress() {
         if (router.backstack.size <= 1 || !router.handleBack()) {
             SecureActivityDelegate.locked = true
-            super.onBackPressed()
         }
     }
 
     private fun popToRoot() {
         if (intentShouldGoBack()) {
-            onBackPressed()
+            onBackPressedDispatcher.onBackPressed()
         } else if (!router.handleBack()) {
             val intent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
+            backToMain = true
             startActivity(intent)
             finishAfterTransition()
         }
     }
 
-    override fun setFloatingToolbar(show: Boolean, solidBG: Boolean, changeBG: Boolean) {
-        super.setFloatingToolbar(show, solidBG, changeBG)
-        currentToolbar?.setNavigationOnClickListener { popToRoot() }
+    override fun setFloatingToolbar(show: Boolean, solidBG: Boolean, changeBG: Boolean, showSearchAnyway: Boolean) {
+        super.setFloatingToolbar(show, solidBG, changeBG, showSearchAnyway)
+        val useLargeTB = binding.appBar.useLargeToolbar
+        if (!useLargeTB) {
+            binding.searchToolbar.navigationIcon = backDrawable
+        } else if (showSearchAnyway) {
+            binding.searchToolbar.navigationIcon =
+                if (!show) searchDrawable else backDrawable
+        }
     }
 
     private fun intentShouldGoBack() =
@@ -67,27 +97,26 @@ class SearchActivity : MainActivity() {
     override fun syncActivityViewWithController(
         to: Controller?,
         from: Controller?,
-        isPush:
-            Boolean
+        isPush: Boolean,
     ) {
         if (from is DialogController || to is DialogController) {
             return
         }
+        reEnableBackPressedCallBack()
         setFloatingToolbar(canShowFloatingToolbar(to))
-        binding.cardToolbar.navigationIcon = backDrawable
-        binding.toolbar.navigationIcon = backDrawable
-
         nav.isVisible = false
         binding.bottomView?.isVisible = false
     }
 
     override fun handleIntentAction(intent: Intent): Boolean {
         val notificationId = intent.getIntExtra("notificationId", -1)
-        if (notificationId > -1) NotificationReceiver.dismissNotification(
-            applicationContext,
-            notificationId,
-            intent.getIntExtra("groupId", 0)
-        )
+        if (notificationId > -1) {
+            NotificationReceiver.dismissNotification(
+                applicationContext,
+                notificationId,
+                intent.getIntExtra("groupId", 0),
+            )
+        }
         when (intent.action) {
             Intent.ACTION_SEARCH, Intent.ACTION_SEND, "com.google.android.gms.actions.SEARCH_ACTION" -> {
                 // If the intent match the "standard" Android search intent
@@ -95,7 +124,12 @@ class SearchActivity : MainActivity() {
 
                 // Get the search query provided in extras, and if not null, perform a global search with it.
                 val query = intent.getStringExtra(SearchManager.QUERY) ?: intent.getStringExtra(Intent.EXTRA_TEXT)
-                if (query != null && query.isNotEmpty()) {
+                if (!query.isNullOrEmpty()) {
+                    extensionIntentForText(query)?.let {
+                        startActivity(it)
+                        finish()
+                        return true
+                    }
                     router.replaceTopController(GlobalSearchController(query).withFadeTransaction())
                 } else {
                     finish()
@@ -104,7 +138,7 @@ class SearchActivity : MainActivity() {
             INTENT_SEARCH -> {
                 val query = intent.getStringExtra(INTENT_SEARCH_QUERY)
                 val filter = intent.getStringExtra(INTENT_SEARCH_FILTER)
-                if (query != null && query.isNotEmpty()) {
+                if (!query.isNullOrEmpty()) {
                     if (router.backstackSize > 1) {
                         router.popToRoot()
                     }
@@ -136,7 +170,7 @@ class SearchActivity : MainActivity() {
                 router.replaceTopController(
                     RouterTransaction.with(MangaDetailsController(extras))
                         .pushChangeHandler(SimpleSwapChangeHandler())
-                        .popChangeHandler(FadeChangeHandler())
+                        .popChangeHandler(FadeChangeHandler()),
                 )
             }
             SHORTCUT_SOURCE -> {
@@ -145,14 +179,14 @@ class SearchActivity : MainActivity() {
                 router.replaceTopController(
                     RouterTransaction.with(BrowseSourceController(extras))
                         .pushChangeHandler(SimpleSwapChangeHandler())
-                        .popChangeHandler(FadeChangeHandler())
+                        .popChangeHandler(FadeChangeHandler()),
                 )
             }
             SHORTCUT_READER_SETTINGS -> {
                 router.replaceTopController(
                     RouterTransaction.with(SettingsReaderController())
                         .pushChangeHandler(SimpleSwapChangeHandler())
-                        .popChangeHandler(FadeChangeHandler())
+                        .popChangeHandler(FadeChangeHandler()),
                 )
             }
             else -> return false
@@ -164,7 +198,7 @@ class SearchActivity : MainActivity() {
         fun openMangaIntent(context: Context, id: Long?, canReturnToMain: Boolean = false) = Intent(
             context,
             SearchActivity::class
-                .java
+                .java,
         )
             .apply {
                 action = if (canReturnToMain) SHORTCUT_MANGA_BACK else SHORTCUT_MANGA
@@ -174,7 +208,7 @@ class SearchActivity : MainActivity() {
         fun openReaderSettings(context: Context) = Intent(
             context,
             SearchActivity::class
-                .java
+                .java,
         )
             .apply {
                 action = SHORTCUT_READER_SETTINGS

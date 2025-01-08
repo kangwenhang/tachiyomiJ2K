@@ -7,9 +7,8 @@ import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.source.model.Page
 
 abstract class BaseChapterItem<T : BaseChapterHolder, H : AbstractHeaderItem<*>>(
-    val chapter:
-        Chapter,
-    header: H? = null
+    val chapter: Chapter,
+    header: H? = null,
 ) :
     AbstractSectionableItem<T, H?>(header),
     Chapter by chapter {

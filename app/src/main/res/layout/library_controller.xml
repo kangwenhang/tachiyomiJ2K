@@ -3,7 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/library_layout"
+    android:background="?background"
     android:layout_width="match_parent"
+    android:clipChildren="false"
     android:layout_height="match_parent">
 
     <ProgressBar
@@ -28,6 +30,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="?actionBarSize"
                 android:clipToPadding="false"
+                android:visibility="invisible"
                 android:paddingBottom="4dp"
                 android:scrollbars="vertical" />
 
@@ -55,12 +58,6 @@
         </FrameLayout>
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
-    <eu.kanade.tachiyomi.ui.base.MaterialFastScroll
-        android:id="@+id/fast_scroller"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:fastScrollerBubbleEnabled="true" />
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/header_card"
@@ -119,12 +116,21 @@
         tools:layout_marginBottom="62dp"
         tools:layout_gravity="bottom|end"
         android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:clipChildren="false"
         android:layout_gravity="top|center">
 
         <include layout="@layout/rounded_category_hopper"
             android:id="@+id/rounded_category_hopper" />
 
     </FrameLayout>
+
+    <eu.kanade.tachiyomi.ui.library.LibraryFastScroll
+        android:id="@+id/fast_scroller"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:fastScrollerBubbleEnabled="true" />
+
     <!-- Adding bottom sheet after main content -->
     <include layout="@layout/filter_bottom_sheet"
         android:id="@+id/filter_bottom_sheet"/>

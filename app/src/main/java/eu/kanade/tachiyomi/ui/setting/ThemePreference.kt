@@ -60,17 +60,17 @@ class ThemePreference @JvmOverloads constructor(context: Context, attrs: Attribu
         fastAdapterDark.setHasStableIds(true)
         selectExtensionLight = fastAdapterLight.getSelectExtension().setThemeListener(false)
         selectExtensionDark = fastAdapterDark.getSelectExtension().setThemeListener(true)
-        val enumConstants = Themes.values()
+        val enumConstants = Themes.entries
         val supportsDynamic = DynamicColors.isDynamicColorAvailable()
         itemAdapterLight.set(
             enumConstants
                 .filter { (!it.isDarkTheme || it.followsSystem) && (it.styleRes != R.style.Theme_Tachiyomi_Monet || supportsDynamic) }
-                .map { ThemeItem(it, false) }
+                .map { ThemeItem(it, false) },
         )
         itemAdapterDark.set(
             enumConstants
                 .filter { (it.isDarkTheme || it.followsSystem) && (it.styleRes != R.style.Theme_Tachiyomi_Monet || supportsDynamic) }
-                .map { ThemeItem(it, true) }
+                .map { ThemeItem(it, true) },
         )
         isSelectable = false
     }
@@ -118,39 +118,43 @@ class ThemePreference @JvmOverloads constructor(context: Context, attrs: Attribu
 
         binding.themeRecycler.adapter = fastAdapterLight
 
-        binding.themeRecycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                super.onScrolled(recyclerView, dx, dy)
-                lastScrollPostionLight =
-                    recyclerView.computeHorizontalScrollOffset()
-            }
-        })
+        binding.themeRecycler.addOnScrollListener(
+            object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    lastScrollPostionLight =
+                        recyclerView.computeHorizontalScrollOffset()
+                }
+            },
+        )
 
         binding.themeRecyclerDark.setHasFixedSize(true)
         binding.themeRecyclerDark.layoutManager = managerDark
 
         binding.themeRecyclerDark.adapter = fastAdapterDark
 
-        binding.themeRecyclerDark.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                super.onScrolled(recyclerView, dx, dy)
-                lastScrollPostionDark =
-                    recyclerView.computeHorizontalScrollOffset()
-            }
-        })
+        binding.themeRecyclerDark.addOnScrollListener(
+            object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    lastScrollPostionDark =
+                        recyclerView.computeHorizontalScrollOffset()
+                }
+            },
+        )
 
         if (lastScrollPostionLight != null) {
             val lX = lastScrollPostionLight!!
             (binding.themeRecycler.layoutManager as LinearLayoutManager).apply {
                 scrollToPositionWithOffset(
                     lX / 110.dpToPx,
-                    -lX % 110.dpToPx
+                    -lX % 110.dpToPx,
                 )
             }
             lastScrollPostionLight = binding.themeRecycler.computeHorizontalScrollOffset()
         } else {
             binding.themeRecycler.scrollToPosition(
-                max((selectExtensionLight.selections.firstOrNull() ?: 0) - 1, 0)
+                max((selectExtensionLight.selections.firstOrNull() ?: 0) - 1, 0),
             )
         }
 
@@ -159,13 +163,13 @@ class ThemePreference @JvmOverloads constructor(context: Context, attrs: Attribu
             (binding.themeRecyclerDark.layoutManager as LinearLayoutManager).apply {
                 scrollToPositionWithOffset(
                     lX / 110.dpToPx,
-                    -lX % 110.dpToPx
+                    -lX % 110.dpToPx,
                 )
             }
             lastScrollPostionDark = binding.themeRecyclerDark.computeHorizontalScrollOffset()
         } else {
             binding.themeRecyclerDark.scrollToPosition(
-                max((selectExtensionDark.selections.firstOrNull() ?: 0) - 1, 0)
+                max((selectExtensionDark.selections.firstOrNull() ?: 0) - 1, 0),
             )
         }
     }
@@ -216,7 +220,7 @@ class ThemePreference @JvmOverloads constructor(context: Context, attrs: Attribu
                         item.theme.darkNameRes
                     } else {
                         item.theme.nameRes
-                    }
+                    },
                 )
 
                 binding.checkbox.isVisible = item.isSelected
@@ -260,10 +264,6 @@ class ThemePreference @JvmOverloads constructor(context: Context, attrs: Attribu
                 binding.themeLayout.setBackgroundColor(background)
                 if (item.isDarkTheme && preferences.themeDarkAmoled().get()) {
                     binding.themeLayout.setBackgroundColor(Color.BLACK)
-                    if (!ThemeUtil.isColoredTheme(item.theme)) {
-                        binding.themeBottomBar.setBackgroundColor(Color.BLACK)
-                        binding.themeToolbar.setBackgroundColor(Color.BLACK)
-                    }
                 }
             }
 

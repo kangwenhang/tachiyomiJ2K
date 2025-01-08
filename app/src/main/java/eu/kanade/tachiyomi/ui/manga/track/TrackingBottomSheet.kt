@@ -8,12 +8,14 @@ import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.StyleSpan
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -81,6 +83,14 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
 
     override var recyclerView: RecyclerView? = binding.trackRecycler
 
+    private val backCallback = object : OnBackPressedCallback(enabled = false) {
+        override fun handleOnBackPressed() {
+            if (searchingItem != null) {
+                hideSearchView()
+            }
+        }
+    }
+
     init {
         val insets = activity.window.decorView.rootWindowInsetsCompat?.getInsets(systemBars())
         val height = insets?.bottom ?: 0
@@ -89,7 +99,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
         sheetBehavior.skipCollapsed = true
 
         binding.searchCloseButton.setOnClickListener {
-            onBackPressed()
+            onBackPressedDispatcher.onBackPressed()
         }
 
         binding.trackSearchRecycler.adapter = adapter
@@ -98,13 +108,16 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
             trackItem(position)
             true
         }
+        onBackPressedDispatcher.addCallback(backCallback)
 
         searchAdapter.addClickListener<TrackSearchItem.ViewHolder, TrackSearchItem>({ it.binding.linkButton }) { _, _, _, item ->
             activity.openInBrowser(item.trackSearch.tracking_url)
         }
 
-        binding.trackSearch.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_SEARCH) {
+        binding.trackSearch.setOnEditorActionListener { _, actionId, keyEvent ->
+            if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_SEARCH ||
+                keyEvent.keyCode == KeyEvent.KEYCODE_ENTER
+            ) {
                 val text = binding.trackSearch.text?.toString() ?: ""
                 if (text.isNotBlank()) {
                     startTransition()
@@ -187,9 +200,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
             return
         }
 
-        if (track.tracking_url.isBlank()) {
-            activity.toast(R.string.url_not_set_click_again)
-        } else {
+        if (track.tracking_url.isNotBlank()) {
             activity.openInBrowser(track.tracking_url.toUri())
             controller.refreshTracker = position
         }
@@ -230,7 +241,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
 
     override fun onTitleLongClick(position: Int) {
         val title = adapter?.getItem(position)?.track?.title ?: return
-        controller.copyToClipboard(title, R.string.title, true)
+        controller.copyContentToClipboard(title, R.string.title, true)
     }
 
     private fun startTransition(duration: Long = 100) {
@@ -245,6 +256,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
 
     private fun showSearchView(item: TrackItem) {
         searchingItem = item
+        backCallback.isEnabled = true
         val title = presenter.manga.title
         sheetBehavior.expand()
         sheetBehavior.isDraggable = false
@@ -262,6 +274,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
         binding.trackRecycler.isVisible = true
         binding.trackSearchConstraintLayout.isVisible = false
         searchingItem = null
+        backCallback.isEnabled = false
     }
 
     private fun search(query: String) {
@@ -292,13 +305,13 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
                 TrackSearchItem(it).apply {
                     isSelected = it.tracking_url == searchingItem?.track?.tracking_url
                 }
-            }
+            },
         )
         if (results.isEmpty()) {
             setMiddleTrackView(binding.searchEmptyView.id)
             binding.searchEmptyView.show(
                 R.drawable.ic_search_off_24dp,
-                R.string.no_results_found
+                R.string.no_results_found,
             )
         } else {
             setMiddleTrackView(binding.trackSearchRecycler.id)
@@ -319,7 +332,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
         searchItemAdapter.clear()
         binding.searchEmptyView.show(
             R.drawable.ic_search_off_24dp,
-            error.message ?: ""
+            error.message ?: "",
         )
     }
 
@@ -337,9 +350,9 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
                     R.string.remove_x_from_service_and_add_y,
                     ogTitle,
                     activity.getString(
-                        searchingItem.service.nameRes()
+                        searchingItem.service.nameRes(),
                     ),
-                    newTitle
+                    newTitle,
                 )
 
                 val wordToSpan: Spannable = SpannableString(text)
@@ -353,8 +366,8 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
                 val text2 = activity.getString(
                     R.string.keep_both_on_service,
                     activity.getString(
-                        searchingItem.service.nameRes()
-                    )
+                        searchingItem.service.nameRes(),
+                    ),
                 )
                 activity.materialAlertDialog()
                     .setTitle(R.string.remove_previous_tracker)
@@ -402,7 +415,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
             .setNegativeButton(android.R.string.cancel, null)
             .setSingleChoiceItems(
                 statusString.toTypedArray(),
-                selectedIndex
+                selectedIndex,
             ) { dialog, itemPosition ->
                 setStatus(item, itemPosition)
                 dialog.dismiss()
@@ -424,8 +437,8 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
                 dialog.setMessage(
                     activity.getString(
                         R.string.cannot_remove_tracking_while_offline,
-                        serviceName
-                    )
+                        serviceName,
+                    ),
                 )
                     .setPositiveButton(R.string.remove) { _, _ ->
                         removeTracker(item, false)
@@ -433,7 +446,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
             } else {
                 dialog.addCheckBoxPrompt(
                     activity.getString(R.string.remove_tracking_from_, serviceName),
-                    true
+                    true,
                 )
                     .setPositiveButton(R.string.remove) { dialogI, _ ->
                         removeTracker(item, dialogI.isPromptChecked)
@@ -469,7 +482,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
 
         val np = binding.chaptersPicker
         // Set initial value
-        np.value = item.track.last_chapter_read
+        np.value = item.track.last_chapter_read.toInt()
         if (item.track.total_chapters > 0) {
             np.wrapSelectorWheel = true
             np.maxValue = item.track.total_chapters
@@ -488,6 +501,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
             return
         }
 
+        val scores = item.service.getScoreList().toTypedArray()
         val binding = TrackScoreDialogBinding.inflate(activity.layoutInflater)
         val dialog = activity.materialAlertDialog()
             .setTitle(R.string.score)
@@ -501,7 +515,6 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
             }
 
         val np = binding.scorePicker
-        val scores = item.service.getScoreList().toTypedArray()
         np.maxValue = scores.size - 1
         np.displayedValues = scores
 
@@ -561,7 +574,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
 
     enum class ReadingDate {
         Start,
-        Finish
+        Finish,
     }
 
     private fun showDatePicker(trackItem: TrackItem, readingDate: ReadingDate, suggestedDate: Long?) {
@@ -570,7 +583,7 @@ class TrackingBottomSheet(private val controller: MangaDetailsController) :
                 when (readingDate) {
                     ReadingDate.Start -> R.string.started_reading_date
                     ReadingDate.Finish -> R.string.finished_reading_date
-                }
+                },
             )
             .setSelection(getCurrentDate(trackItem, readingDate, suggestedDate)?.timeInMillis).apply {
             }

@@ -167,13 +167,9 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
                 (oldCurrent?.first as? ReaderPage)?.firstHalf == false
             } else {
                 oldCurrent?.second == current ||
-                    (current.index + 1) < (
-                    (
-                        oldCurrent?.second
-                            ?: oldCurrent?.first
-                        ) as? ReaderPage
-                    )?.index ?: 0
-            }
+                    (current.index + 1) <
+                    (((oldCurrent?.second ?: oldCurrent?.first) as? ReaderPage)?.index ?: 0)
+            },
         )
 
         // The listener may be removed when we split a page, so the ui may not have updated properly
@@ -189,8 +185,12 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
         if (!viewer.config.doublePages) {
             // If not in double mode, set up items like before
             subItems.forEach {
-                (it as? ReaderPage)?.shiftedPage = false
-                (it as? ReaderPage)?.firstHalf = null
+                (it as? ReaderPage)?.apply {
+                    shiftedPage = false
+                    firstHalf = null
+                    endPageConfidence = null
+                    startPageConfidence = null
+                }
             }
             if (viewer.config.splitPages) {
                 var itemIndex = 0
@@ -214,7 +214,7 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
                 this.joinedItems = pagedItems.map {
                     Pair<Any, Any?>(
                         it,
-                        if ((it as? ReaderPage)?.fullPage == true) (it as? ReaderPage)?.firstHalf else null
+                        if ((it as? ReaderPage)?.fullPage == true) (it as? ReaderPage)?.firstHalf else null,
                     )
                 }.toMutableList()
             } else {
@@ -263,10 +263,14 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
                         val fullPageBeforeIndex = max(
                             0,
                             (
-                                if (index > -1) (
-                                    items.take(index).indexOfLast { it?.fullPage == true }
-                                    ) else -1
-                                )
+                                if (index > -1) {
+                                    (
+                                        items.take(index).indexOfLast { it?.fullPage == true }
+                                        )
+                                } else {
+                                    -1
+                                }
+                                ),
                         )
                         // Add a shifted page to the first place there isnt a full page
                         (fullPageBeforeIndex until items.size).forEach {
@@ -305,12 +309,22 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
                 // Step 5: chunk em
                 if (items.isNotEmpty()) {
                     subJoinedItems.addAll(
-                        items.chunked(2).map { Pair(it.first()!!, it.getOrNull(1)) }
+                        items.chunked(2).map { Pair(it.first()!!, it.getOrNull(1)) },
                     )
                 }
                 otherItems.getOrNull(pagedIndex)?.let {
-                    subJoinedItems.add(Pair(it, null))
-                    pagedIndex++
+                    val lastPage = subJoinedItems.lastOrNull()?.first as? ReaderPage
+                    if (lastPage == null || (
+                        if (it is ChapterTransition.Next) {
+                            it.from.chapter.id == lastPage.chapter.chapter.id
+                        } else {
+                            true
+                        }
+                        )
+                    ) {
+                        subJoinedItems.add(Pair(it, null))
+                        pagedIndex++
+                    }
                 }
             }
             if (viewer is R2LPagerViewer) {

@@ -18,7 +18,6 @@
     <string name="alphabetically">वर्णक्रमानुसार</string>
     <string name="total_chapters">कुल अध्याय</string>
     <string name="last_read">आखिर में पढ़ा हुआ</string>
-    <string name="last_updated">आखिरी अद्यतन</string>
     <string name="search">खोज</string>
     <string name="select_all">सभी का चयन करे</string>
     <string name="mark_as_read">पढ़ा हुआ चिह्न करे</string>
@@ -69,12 +68,10 @@
     <string name="weekly">साप्ताहिक</string>
     <string name="categories_to_include_in_global_update">वैश्विक श्रेणियाँ जो अद्यतन में शामिल करनी है</string>
     <string name="all">समस्त</string>
-    <string name="library_update_restriction">पुस्तकालय अद्यतन प्रतिबंध</string>
+    <string name="library_update_restriction">डिवाइस प्रतिबंध</string>
     <string name="library_update_restriction_summary">अद्यतन तभी जब परिस्थिति अनुकूल हो</string>
     <string name="wifi">वाई - फाई</string>
     <string name="charging">चार्ज होते समय</string>
-    <string name="only_update_ongoing">केवल चालू मंगा का अद्यतन करे</string>
-    <string name="sync_chapters_after_reading">अध्याय पढ़ने के बाद समकालीन करे</string>
     <string name="app_theme">एप्पलीकेशन थीम</string>
     <string name="dark">गहरी थीम</string>
     <string name="amoled_black">अलौकिक थीम</string>
@@ -91,7 +88,6 @@
     <string name="navigation">पथ प्रदर्शन</string>
     <string name="volume_keys">ध्वनि कुंजी</string>
     <string name="invert_volume_keys">ध्वनि कुंजी पलटे</string>
-    <string name="tapping">थपथपाना</string>
     <string name="background_color">पीछे का रंग</string>
     <string name="white">सफेद</string>
     <string name="black">काला</string>
@@ -139,18 +135,18 @@
     <string name="backup_location">बैकअप निर्देशिका</string>
     <string name="backup_frequency">बैकअप फ़्रीक्वेंसी</string>
     <string name="max_auto_backups">अधिकतम स्वचालित बैकअप</string>
-    <string name="backup_created">बैकअप बनाया</string>
+    <string name="backup_created">बैकअप बनाया गया है</string>
     <string name="restore_completed">पुनर्स्थापना पूर्ण हुआ</string>
     <string name="what_should_backup">आप बैकअप के लिए क्या चाहते हैं?</string>
     <string name="restoring_backup">बैकअप को पुनर्स्थापित करना</string>
     <string name="clear_chapter_cache">अध्याय कैश साफ़ करें</string>
     <string name="used_">उपयोग किया गया: %1$s</string>
-    <string name="cache_delete_error">कैश साफ़ करने के दौरान एक त्रुटि हुई</string>
+    <string name="cache_delete_error">साफ़ करने के दौरान त्रुटि हुई</string>
     <string name="clear_cookies">कुकीज़ को साफ़ करें</string>
     <string name="cookies_cleared">कुकीज़ को साफ़ किया हुआ</string>
     <string name="clear_database">डेटाबेस साफ़ करें</string>
-    <string name="clear_database_summary">मैंगा और अध्याय जो आपकी लाइब्रेरी में नहीं हैं हटाएं</string>
-    <string name="clear_database_confirmation">क्या आपको यकीन है? अध्यायों और गैर-पुस्तकालय मंगा की प्रगति को खो दिया जाएगा</string>
+    <string name="clear_database_summary">उन आइटम का इतिहास हटाएं जो आपकी पुस्तकालय में सहेजी नहीं गई हैं</string>
+    <string name="clear_database_confirmation">क्या आपको यकीन है\? आपके द्वारा पढ़े गए अध्याय और गैर-पुस्तकालय आइटम की प्रगति खो जाएगी</string>
     <string name="clear_database_completed">प्रविष्टियां हटाई गईं</string>
     <string name="refresh_library_metadata">रीफ़्रेश लाइब्रेरी मेटाडेटा</string>
     <string name="updates_covers_genres_desc">अपडेट कवर, शैलियों, विवरण और मंगा स्थिति की जानकारी</string>
@@ -184,7 +180,6 @@
     <string name="downloading">डाउनलोड कर रहा है</string>
     <string name="downloading_progress">डाउनलोड किया जा रहा है (%1$d/%2$d)</string>
     <string name="paused">रोका हुआ</string>
-    <string name="next_5_unread">अगले ५ अध्याय डाउनलोड करें</string>
     <string name="all_chapters">सभी डाउनलोड करे</string>
     <string name="all_unread_chapters">अपठित डाउनलोड करें</string>
     <string name="reading">पठन</string>
@@ -195,30 +190,29 @@
     <string name="score">स्कोर</string>
     <string name="title">शीर्षक</string>
     <string name="category_with_name_exists">इस नाम के साथ एक श्रेणी पहले से मौजूद है!</string>
-    <string name="this_will_remove_the_read_date_question">यह इस अध्याय की पठन तिथि को निकाल देगा क्या आप निश्चित है?</string>
     <string name="picture_saved">चित्र सहेजा गया</string>
     <string name="options">विकल्प</string>
     <string name="set_as_cover">कवर के रूप में सेट करें</string>
     <string name="cover_updated">कवर अपडेट किया गया</string>
     <string name="page_">पृष्ठ: %1$d</string>
     <string name="next_chapter_not_found">अगले अध्याय नहीं मिला</string>
-    <string name="decode_image_error">छवि को डीकोड नहीं किया जा सका</string>
+    <string name="decode_image_error">छवि को लोड नहीं किया जा सका</string>
     <string name="use_image_as_cover">क्या आप इस छवि को कवर के रूप में सेट करना चाहते हैं?</string>
     <string name="new_chapters_found">नए अध्याय पाए गए</string>
     <string name="failed_to_update_cover">कवर को अपडेट करने में विफल</string>
-    <string name="must_be_in_library_to_edit">ऐसा करने से पहले कृपया अपनी लाइब्रेरी में मंगा को जोड़ें</string>
+    <string name="must_be_in_library_to_edit">एडिट करने के लिए सीरीज आपकी लाइब्रेरी में होना आवश्यक है</string>
     <string name="select_cover_image">कवर छवि का चयन करें</string>
     <string name="select_backup_file">बैकअप फ़ाइल का चयन करें</string>
     <string name="new_version_available">नया अद्यतन उपलब्ध है!</string>
     <string name="ignore">नज़रअंदाज़ करे</string>
     <string name="no_new_updates_available">कोई नया अद्यतन उपलब्ध नहीं है</string>
-    <string name="searching_for_updates">अद्यतन ढूंढ रहे हैं</string>
+    <string name="searching_for_updates">अपडेट्स ढूंढ रहे हैं…</string>
     <string name="download_complete">डाउनलोड सम्पन्न हुआ</string>
     <string name="download_error">डाउनलोड त्रुटि</string>
     <string name="update_available">अद्यतन उपलब्ध है</string>
     <string name="cover_of_image">मंगा का आवरण</string>
     <string name="no_recent_chapters">हाल के कोई अध्याय नहीं है</string>
-    <string name="no_recently_read_manga">हाल ही में मंगा पढ़ा नहीं है</string>
+    <string name="no_recently_read_manga">कोई हाल ही में पढ़ा सीरीज नही है</string>
     <string name="library_is_empty_add_from_browse">आपकी लाइब्रेरी खाली है, आप कैटलॉग से अपनी लाइब्रेरी में श्रृंखला जोड़ सकते हैं।</string>
     <string name="could_not_download_unexpected_error">अध्याय डाउनलोड करते समय एक अनपेक्षित त्रुटि हुई</string>
     <string name="no_wifi_connection">कोई वाई-फ़ाई कनेक्शन उपलब्ध नहीं है</string>
@@ -237,7 +231,7 @@
     <string name="untrusted_extension">अविश्वस्त एक्सटेंशन</string>
     <string name="untrusted_extension_message">यह एक्सटेंशन एक अविश्वस्त प्रमाणपत्र के साथ हस्ताक्षरित हुआ था और सक्रिय नहीं हुआ था।
 \n
-\nदुर्भावनापूर्ण विस्तार, किसी भी लॉगिन क्रेडेंशियल्स को तचीयोमी में संग्रहीत या मनमाना कोड निष्पादित कर सकता है
+\nदुर्भावनापूर्ण विस्तार, किसी भी लॉगिन क्रेडेंशियल्स को ताचियोमी में संग्रहीत या मनमाना कोड निष्पादित कर सकता है
 \n
 \nइस प्रमाणपत्र पर विश्वास करके आप इन जोखिमों को स्वीकार करते हैं।</string>
     <string name="version_">संस्करण: %1$s</string>
@@ -245,7 +239,7 @@
     <string name="double_tap_anim_speed">डबल टैप एनीमेशन गति</string>
     <string name="no_animation">कोई एनीमेशन नहीं</string>
     <string name="normal">साधारण</string>
-    <string name="fast">उपवास</string>
+    <string name="fast">तेज</string>
     <string name="search_filters">खोज फ़िल्टर</string>
     <string name="added_to_library">पुस्तकालय में जोड़ा गया</string>
     <string name="removed_from_library">लाइब्रेरी से निकाला गया</string>
@@ -256,7 +250,6 @@
     <string name="rereading">फिर से पढाना</string>
     <string name="started">शुरू कर दिया है</string>
     <string name="type">प्रकार</string>
-    <string name="url_not_set_click_again">मंगा यूआरएल सेट नहीं है कृपया शीर्षक पर क्लिक करें और फिर मंगा का चयन करें</string>
     <string name="finished_chapter">समाप्त:</string>
     <string name="current_chapter">प्रचलित:</string>
     <string name="next_title">अगला:</string>
@@ -275,9 +268,8 @@
     <string name="dodge_lighten">चकमा/हल्का</string>
     <string name="burn_darken">जल/गहरा</string>
     <string name="help">मदद</string>
-    <string name="library_update_order">लाइब्रेरी अद्यतन क्रम</string>
     <string name="no_results_found">कोई परिणाम नहीं मिला</string>
-    <string name="lock_with_biometrics">बायोमेट्रिक्स के साथ लॉक करें</string>
+    <string name="lock_with_biometrics">खोलने की आवश्यकता है</string>
     <string name="lock_when_idle">निष्क्रिय होने पर लॉक करें</string>
     <string name="refresh_tracking">रिफ्रेश ट्रैकिंग</string>
     <string name="add_tracking">ट्रैकिंग जोड़ें</string>
@@ -291,10 +283,6 @@
     <string name="updating_library">अद्यतन पुस्तकालय</string>
     <string name="date_added">तारीख को जोड़ा गया</string>
     <string name="latest_chapter">नवीनतम अध्याय</string>
-    <plurals name="notification_update_failed">
-        <item quantity="one">1 अद्यतन विफल हुआ%1$d अपडेट विफल रहे</item>
-        <item quantity="other"/>
-    </plurals>
     <string name="local_source_help_guide">स्थानीय स्रोत गाइड</string>
     <string name="check_site_in_web">वेबव्यू में वेबसाइट देखें</string>
     <string name="obsolete">अप्रचलित</string>
@@ -303,7 +291,7 @@
         <item quantity="one">एक्सटेंशन अपडेट उपलब्ध%d एक्सटेंशन अपडेट उपलब्ध</item>
         <item quantity="other"/>
     </plurals>
-    <string name="reduces_banding_impacts_performance">बैंडिंग को कम करता है, लेकिन प्रदर्शन को प्रभावित करता है</string>
+    <string name="reduces_banding_impacts_performance">बैंडिंग को कम करता है, लेकिन प्रदर्शन को प्रभावित कर सकता है</string>
     <string name="skip_filtered_chapters">फ़िल्टर किए गए अध्यायों को छोड़ें</string>
     <string name="continuous_vertical">लगातार लंबवत</string>
     <string name="paged">पृष्ठांकित</string>
@@ -320,7 +308,7 @@
     <string name="requires_app_restart">प्रभावी होने के लिए एप्लिकेशन पुनरारंभ की आवश्यकता होती है</string>
     <string name="disable_battery_optimization">बैटरी अनुकूलन को अक्षम करना</string>
     <string name="battery_optimization_disabled">बैटरी अनुकूलन पहले से ही अक्षम है</string>
-    <string name="pref_global_search">विश्वीय खोज</string>
+    <string name="pref_global_search">वैश्विक खोज</string>
     <string name="check_for_extension_updates">एक्सटेंशन अपडेट की जांच करें</string>
     <string name="website">वेबसाइट</string>
     <string name="open_source_licenses">ओपन सोर्स लाइसेंस</string>
@@ -351,22 +339,19 @@
     <string name="kindlish_nav">किंडल-जैसे</string>
     <string name="edge_nav">धार</string>
     <string name="right_and_left_nav">दाएं और बाएं</string>
-    <string name="invert_tapping">उलटा दोहन</string>
+    <string name="invert_tapping">टैप ज़ोन उलटें</string>
     <string name="none">कोई नहीं</string>
     <string name="no_chapters_error">कोई अध्याय नहीं मिला</string>
     <string name="badges">बैज</string>
     <string name="last_used">आखरी इस्त्तमाल किया गया</string>
-    <string name="unofficial_extension_message">यह एक्सटेंशन आधिकारिक तचियोमी एक्सटेंशन सूची से नहीं है।</string>
     <string name="nsfw_short">18+</string>
-    <string name="unofficial">अनौपचारिक</string>
     <string name="may_contain_nsfw">इसमें NSFW (18+) सामग्री हो सकती है</string>
     <string name="next_page">अगला पृष्ठ</string>
     <string name="previous_page">पिछला पृष्ठ</string>
-    <string name="next_chapter">अगला पृष्ठ</string>
-    <string name="previous_chapter">पिछला पृष्ठ</string>
+    <string name="next_chapter">अगला अध्याय</string>
+    <string name="previous_chapter">पिछला अध्याय</string>
     <string name="animate_page_transitions">चेतन पृष्ठ संक्रमण</string>
     <string name="default_reading_mode">डिफ़ॉल्ट रीडिंग मोड</string>
-    <string name="nav_layout">नेविगेशन लेआउट</string>
     <string name="started_reading_date">पढ़ना शुरू करने की तारीख</string>
     <string name="finished_reading_date">पढ़ना समाप्त की तिथि</string>
     <string name="myanimelist_relogin">कृपया फिर से MAL पर लॉगिन करें</string>
@@ -376,13 +361,9 @@
     <string name="invalid_backup_file">अमान्य बैकअप फ़ाइल</string>
     <string name="invalid_backup_file_type">अमान्य बैकअप फ़ाइल प्रकार: %1$s
 \nयह .proto.gz या .json के साथ समाप्त होना चाहिए।</string>
-    <string name="file_is_missing_data">फाइल में डेटा गायब है।</string>
     <string name="backup_has_no_manga">बैकअप में कोई मंगा नहीं होता है।</string>
     <string name="restore_missing_sources">अनुपलब्ध स्रोत:</string>
     <string name="restore_missing_trackers">ट्रैकर्स में लॉग इन नहीं किया गया:</string>
-    <string name="restore_content">डेटा लाने के लिए स्रोतों का उपयोग करें, वाहक लागत लागू हो सकती है।
-\n
-\nसुनिश्चित करें कि आपने सभी आवश्यक एक्सटेंशन स्थापित किए हैं और बहाल करने से पहले स्रोतों और ट्रैकिंग सेवाओं में लॉग इन किया है।</string>
     <string name="restore_content_full">बैकअप फ़ाइल से डेटा बहाल किया जाएगा।
 \n
 \nआपको किसी भी लापता एक्सटेंशन को इंस्टॉल करना होगा और बाद में सेवाओं को ट्रैक करने के लिए लॉग इन करना होगा ताकि उनका उपयोग किया जा सके।</string>
@@ -399,8 +380,8 @@
     <string name="file_picker_error">कोई फ़ाइल पिकर ऐप नहीं मिला</string>
     <string name="open_log">लॉग खोले</string>
     <plurals name="category_plural">
-        <item quantity="one">%d श्रेणी%d श्रेणियाँ</item>
-        <item quantity="other"/>
+        <item quantity="one">%d श्रेणी</item>
+        <item quantity="other">%d श्रेणियाँ</item>
     </plurals>
     <string name="backup_and_restore">बैकअप और पुनर्स्थापना</string>
     <string name="progress">प्रगती</string>
@@ -410,14 +391,13 @@
     <string name="saves_error_logs">डेवलपर्स के साथ साझा करने के लिए फ़ाइल में त्रुटि लॉग सहेजता है</string>
     <string name="crash_log_saved">क्रैश लॉग सहेजे गए</string>
     <string name="updated_to_">v%1$s तक अद्यतन</string>
-    <string name="hide_app_block_screenshots">एप्लिकेशन स्विच करते समय एप्लिकेशन सामग्री छिपाएं और स्क्रीनशॉट ब्लॉक करें</string>
-    <string name="label_global_search">विश्वीय खोज</string>
+    <string name="label_global_search">वैश्विक खोज</string>
     <string name="cancel_all_for_series">इस श्रृंखला के लिए सभी रद्द करें</string>
     <string name="change">परिवर्तन</string>
-    <string name="bottom">सबसे नीचे</string>
+    <string name="bottom">नीचे</string>
     <string name="beta">बेटा</string>
     <plurals name="after_minutes">
-        <item quantity="one">%1$s मिनट बाद</item>
+        <item quantity="one">%1$s मिनट के बाद%1$s मिनट के बाद</item>
         <item quantity="other"/>
     </plurals>
     <string name="delete_downloaded_if_removed_online">डाउनलोड किए गए अध्यायों को हटा दें यदि स्रोत ने अध्याय को ऑनलाइन हटा दिया है</string>
@@ -433,8 +413,8 @@
     <string name="error_saving_cover">कवर पेज सहेजने में त्रुटि</string>
     <string name="getting_started_guide">प्रारंभिक मार्गदर्शन</string>
     <plurals name="missing_chapters_warning">
-        <item quantity="one">1 अध्याय छोड़ा जा रहा है, या तो स्रोत में यह अनुपलब्ध है या इसे फ़िल्टर कर दिया गया है</item>
-        <item quantity="other">%d अध्याय छोड़े जा रहा है, या तो स्रोत में यह अनुपलब्ध है या इसे फ़िल्टर कर दिया गया है</item>
+        <item quantity="one">%d अध्याय को छोड़ा जा रहा है, या तो स्रोत में यह नहीं है या इसे फ़िल्टर कर दिया गया है</item>
+        <item quantity="other">%d अध्यायों को छोड़ा जा रहा है, या तो स्रोत उन्हें याद कर रहा है या उन्हें फ़िल्टर कर दिया गया है</item>
     </plurals>
     <string name="no_pages_found">कोई पृष्ठ नहीं मिला</string>
     <string name="tako">टाको</string>
@@ -464,7 +444,6 @@
     <string name="landscape">लैंडस्केप</string>
     <string name="locked_portrait">सीधे बंद</string>
     <string name="locked_landscape">मजबूर लैंडस्केप</string>
-    <string name="create_folders_by_manga_title">पुस्तक के शीर्षक के अनुसार फोल्डर बनाता है</string>
     <string name="set_as_default">डिफ़ॉल्ट के रूप में सेट करें</string>
     <string name="strawberry_daiquiri">स्ट्रॉबेरी</string>
     <string name="side_nav_icon_alignment">साइड नेविगेशन आइकन अलाइनमेंट</string>
@@ -488,24 +467,24 @@
     <string name="comic">कॉमिक</string>
     <string name="new_chapters">नए अध्याय</string>
     <string name="all_files_permission_required">फाइल की अनुमति चाहिए</string>
-    <string name="external_storage_permission_notice">ताचियोमी को एंड्राइड ११ में फाइल अनुमति चाहिए ताकि वो चैप्टर डाउनलोड कर सके, आटोमेटिक बैकअप बना सके और लोकल माँगा पढ़ सके 
+    <string name="external_storage_permission_notice">TachiyomiJ2K को अध्याय डाउनलोड करने, स्वचालित बैकअप बनाने और स्थानीय श्रृंखला पढ़ने के लिए एंड्रॉइड 11 में सभी फ़ाइलों तक पहुंच की आवश्यकता होती है।
 \n
-\nअगले स्क्रीन में, सारे फाइल को एक्सेस करने की अनुमति को सेलेक्ट करे</string>
-    <string name="manhwa">माणःवा</string>
+\nअगली स्क्रीन पर, \"सभी फ़ाइलों को एक्सेस करने के लिए पहुंच की अनुमति दें\" सक्षम करें।</string>
+    <string name="manhwa">मानह्वा</string>
     <string name="not_started">शुरू नहीं हुआ हैं</string>
     <string name="external_storage_download_notice">ताचियोमी ज २ क को सारे फाइल को एक्सेस करने की अनुमति चाहिए ताकि वो नए चैप्टर डाउनलोड कर सके. यहाँ पे क्लिक करके \" सारे फाइल को एक्सेस करने की अनुमति दे \"</string>
     <string name="in_progress">चालु हैं</string>
     <string name="unlock_library">लाइब्रेरी तक पहुंचने के लिए अनलॉक करें</string>
     <string name="last_read_chapter_">अंतिम पढ़ा अध्याय %1$s</string>
-    <string name="chapter_x_of_y">%2$d का %1$d अध्याय</string>
+    <string name="chapter_x_of_y">अध्याय %1$d/%2$d</string>
     <string name="all_chapters_read">सरे अध्याय पढ़े जा चुके हैं</string>
-    <string name="download_queue_size_warning">चेतावनी: बड़े बल्क डाउनलोड के कारण स्रोत धीमे हो सकते हैं और/या टैचियोमी को अवरुद्ध कर सकते हैं</string>
+    <string name="download_queue_size_warning">चेतावनी: बड़े बल्क डाउनलोड के कारण स्रोत धीमे हो सकते हैं। और/या ताचियोमी को ब्लॉक कर सकते हैं। अधिक जानने के लिए यह टैप करें ।</string>
     <string name="every_3_days">हर 3 दिन</string>
     <string name="by_source_order">स्त्रोत के क्रम के अनुसार</string>
     <string name="category">श्रेणी</string>
     <plurals name="chapters_plural">
-        <item quantity="one">अध्याय %1$d</item>
-        <item quantity="other"/>
+        <item quantity="one">अध्याय %1$s</item>
+        <item quantity="other">अध्यायों %1$s</item>
     </plurals>
     <plurals name="pages_left">
         <item quantity="one">%1$d पृष्ठ बाकि</item>
@@ -521,7 +500,6 @@
     <string name="create_new_category">नई श्रेड़ी का निर्माण करें</string>
     <string name="new_category">नई श्रेणी</string>
     <string name="category_is_empty">श्रेणी खाली है</string>
-    <string name="first_category">पहली श्रेणी</string>
     <string name="confirm_category_deletion">क्या श्रेणी को नष्ट करना है\?</string>
     <plurals name="remove_n_chapters">
         <item quantity="one">%1$d डाउनलोड अध्याय को निकालें\?</item>
@@ -535,4 +513,244 @@
     <string name="on_hiatus">अंतराल पर है</string>
     <string name="enhanced_services">उन्नत सेवाएं</string>
     <string name="enhanced_tracking_info">ऐसी सेवाएँ जो विशिष्ट स्रोतों के लिए उन्नत सुविधाएँ प्रदान करती हैं। आपकी पुस्तकालय में जोड़े जाने पर पुस्तकें स्वचालित रूप से ट्रैक की जाती हैं।</string>
+    <plurals name="for_n_titles">
+        <item quantity="one">%d शीर्षक के लिए</item>
+        <item quantity="other">%d शीर्षकों के लिए</item>
+    </plurals>
+    <string name="move_series_to_top">श्रृंखला को शीर्ष पर ले जाएं</string>
+    <string name="local_invalid_format">अमान्य अध्याय प्रारूप</string>
+    <string name="order_by">के अनुसार ऑर्डर करें</string>
+    <string name="navigate_pan">पैन पर नेविगेट करें</string>
+    <string name="grayscale">काला और सफेद</string>
+    <string name="pref_inverted_colors">उल्टी</string>
+    <string name="ascending">आरोही</string>
+    <string name="date">दिनांक</string>
+    <string name="descending">अवरोही</string>
+    <string name="database_clean">डेटाबेस साफ़ करें</string>
+    <string name="clear_database_source_item_count">डेटाबेस में %1$d गैर-पुस्तकालय आइटम</string>
+    <string name="confirm_manga_add_duplicate">आपकी लाइब्रेरी में एक ही नाम के साथ लेकिन एक अलग स्रोत (%1$s) से एक प्रविष्टि है।
+\n
+\nक्या आप अभी भी जारी रखना चाहते हैं\?</string>
+    <string name="select_inverse">विलोम का चयन करें</string>
+    <string name="cover_only_grid">केवल कवर ग्रिड</string>
+    <string name="notification_update_error">%1$d अपडेट विफल</string>
+    <string name="notification_update_skipped">%1$d अपडेट छोड़े गए</string>
+    <string name="skipped_reason_completed">छोड़े गए क्योंकि श्रृंखला पूरी हो गई है</string>
+    <string name="skipped_reason_not_caught_up">छोड़ दिया गया क्योंकि वहाँ अपठित अध्याय हैं</string>
+    <string name="skipped_reason_not_started">छोड़ दिया गया क्योंकि कोई अध्याय पढ़ा नहीं गया</string>
+    <string name="channel_skipped">छोड़े गए</string>
+    <string name="tap_to_see_details">विवरण देखने के लिए टैप करें</string>
+    <string name="save_chapters_as_cbz">CBZ आर्कैव के रूप में सहेजें</string>
+    <string name="clear_history">इतिहास मिटा दें</string>
+    <string name="clear_history_completed">इतिहास हटाया गया</string>
+    <string name="clear_history_confirmation">क्या आपको यकीन है\? सारा इतिहास खो जाएगा।</string>
+    <string name="backup_restore_invalid_uri">त्रुटि: खाली यू॰आर॰ऐ</string>
+    <string name="backup_info">स्वचालित बैकअप की अत्यधिक अनुशंसा की जाती है। आपको अन्य जगहों पर भी प्रतियां रखनी चाहिए।</string>
+    <string name="pref_manage_notifications">सूचनाओं का प्रबंधन</string>
+    <string name="faq_and_guides">सामान्य प्रश्नोत्तर और मार्गदर्शन</string>
+    <string name="secure_screen_summary">सुरक्षित स्क्रीन एप्लिकेशन स्विच करते समय एप्लिकेशन सामग्री छिपाता हैं और स्क्रीनशॉट ब्लॉक करता हैं</string>
+    <string name="pref_hide_threshold">स्क्रॉल पर मेनू छिपाने की संवेदनशीलता</string>
+    <string name="pref_highest">उच्चतम</string>
+    <string name="pref_high">उच्च</string>
+    <string name="pref_low">कम</string>
+    <string name="pref_lowest">निम्नतम</string>
+    <string name="webview_data_deleted">WebView डेटा साफ हो गया</string>
+    <string name="pref_clear_webview_data">WebView डाटा साफ करें</string>
+    <string name="battery_not_low">बैटरी कम नहीं</string>
+    <string name="empty_backup_error">बैकअप करने के लिए कोई पुस्तकालय प्रविष्टि नहीं</string>
+    <string name="pref_update_only_started">जो शुरू नहीं हुए हैं</string>
+    <string name="pref_update_only_completely_read">अपठित अध्याय हैं</string>
+    <string name="pref_library_update_manga_restriction">शीर्षक अद्यतन न करें</string>
+    <string name="split_tall_images_summary">लंबी डाउनलोड किए गए चित्रों के हिस्से करके पाठमाला के प्रदर्शन में सुधार लाता है</string>
+    <string name="tap_to_learn_more">अधिक जानकारी के लिए दबाए</string>
+    <string name="reading_list">पठन सूची</string>
+    <string name="wish_list">विश-लिस्ट</string>
+    <string name="update_completed">अद्यतन पूर्ण हुआ</string>
+    <string name="new_beta_version_available">नया बीटा संस्करण उपलब्ध!</string>
+    <string name="your_library">आपकी लाइब्रेरी</string>
+    <string name="download_notifier_split_failed">डाउनलोड किया गया चित्र विभाजित नहीं हो सका</string>
+    <string name="complete_list">पूरी सूची</string>
+    <string name="unfinished_list">अधूरी सूची</string>
+    <string name="show_categories_while_filtering">फ़िल्टर करते समय रिक्त श्रेणियाँ दिखाएँ</string>
+    <string name="confirm_category_deletion_message">इस श्रेणी के एंट्रीज, डिफ़ॉल्ट श्रेणी में चले जायेंगे।</string>
+    <string name="add_categories">श्रेणियाँ जोड़ें</string>
+    <string name="add_edit_categories">श्रेणियाँ जोड़ें/संपादित करें</string>
+    <string name="manage_category">श्रेणी प्रबंधित करें</string>
+    <string name="category_cannot_be_blank">श्रेणी नाम रिक्त नहीं हो सकता</string>
+    <string name="category_deleted">श्रेणी हटाई गई</string>
+    <string name="jump_to_category">श्रेणी में जाएँ</string>
+    <string name="release_page">रिलीज़ पेज</string>
+    <string name="library_search_hint">शीर्षक, टैग, स्रोत खोजें</string>
+    <string name="no_description">कोई विवरण नहीं</string>
+    <string name="webtoon_side_padding_5">५%</string>
+    <string name="downloaded_chapters">डाउनलोड किए गए अध्याय</string>
+    <string name="no_matches_for_filters_short">आपके फ़िल्टर के लिए कोई मिलान नहीं</string>
+    <string name="loader_rar5_error">RARv5 प्रारूप समर्थित नहीं है</string>
+    <string name="download_ahead">आगे डाउनलोड करें</string>
+    <string name="auto_download_while_reading">पढ़ते समय ऑटो डाउनलोड करे</string>
+    <plurals name="next_unread_chapters">
+        <item quantity="one">अगला अपठित अध्याय</item>
+        <item quantity="other">अगले %d अपठित अध्याय</item>
+    </plurals>
+    <string name="on_hold_list">होल्ड लिस्ट में</string>
+    <string name="download_ahead_info">केवल लाइब्रेरी में प्रविष्टियों पर काम करता है। और यदि वर्तमान अध्याय और अगला अध्याय पहले ही डाउनलोड हो चुका है</string>
+    <string name="tap_zones">टैप ज़ोन</string>
+    <string name="pref_update_only_non_completed">पूरी की गई श्रृंखला</string>
+    <string name="lavender">लैवेंडर</string>
+    <string name="user_agent_string">चूक यूजर एजेंट स्ट्रिंग (User agent string)</string>
+    <string name="split_tall_images">लंबे चित्रों की ऑटो हिस्से</string>
+    <string name="download_notifier_split_page_not_found">पेज %d हिस्से करते वक्त नहीं मिला</string>
+    <string name="already_in_category">एंट्री पहले से ही श्रेणी में है</string>
+    <string name="long_press_category">किसी श्रेणी को बदल ने के लिए दबाकर रखें</string>
+    <string name="could_not_install_update">अपडेट इंस्टॉल नहीं किया जा सका</string>
+    <string name="show_all_categories">सभी श्रेणियां दिखाएं</string>
+    <string name="when_grouping_by_sources_tags">स्रोतों, स्थिति, आदि द्वारा लाइब्रेरी को ग्रुप करते समय।</string>
+    <string name="no_matches_for_filters">आपके वर्तमान फ़िल्टर के लिए कोई मिलान नहीं मिला</string>
+    <string name="always_show_current_category">हमेशा वर्तमान श्रेणी दिखाएं</string>
+    <string name="expand_collapse_all_categories">सभी श्रेणियों का विस्तार/संक्षिप्त करें</string>
+    <string name="popular">लोकप्रिय</string>
+    <string name="allow_deleting_bookmarked_chapters">बुकमार्क किए गए अध्यायों को हटाने की अनुमति दें</string>
+    <string name="statistics">आंकड़े</string>
+    <string name="appwidget_unavailable_locked">ऐप लॉक लागू होने पर विजेट उपलब्ध नहीं होता</string>
+    <string name="updating_">%1$s अपडेट किया जा रहा</string>
+    <string name="move_dynamic_to_bottom">बंद डायनेमिक कैटेगरी को नीचे भेजे</string>
+    <string name="expand_all_categories">सारे कैटेगरी को खोले</string>
+    <string name="collapse_all_categories">सारे कैटेगरी को बंद करे</string>
+    <string name="search_globally">ग्लोबल पर %1$s खोजें</string>
+    <string name="view_all">सारा देखे</string>
+    <string name="series">सीरीज</string>
+    <string name="updates_last_update_info">पुस्तकालय पिछली बार अपडेट किया गया: %s</string>
+    <string name="appwidget_updates_description">अपनी हाल ही में अपडेट की गई पुस्तकालय एन्ट्री देखें</string>
+    <string name="grid_size">ग्रिड आकार</string>
+    <string name="hide_in_library_items">पुस्तकालय में पहले से ही रही आइटम को छिपाएँ</string>
+    <string name="gray_background">ग्रे</string>
+    <string name="skip_dupe_chapters">डुप्लिकेट चैप्टर छोड़ें</string>
+    <string name="app_updates">ऐप अपडेट</string>
+    <string name="pref_remove_exclude_categories">बहिष्कृत श्रेणियां</string>
+    <string name="ext_installer_pref">इंस्टालर</string>
+    <string name="library_entries">लाइब्रेरी एंट्रीज</string>
+    <string name="pref_debug_info">डीबग जानकारी</string>
+    <string name="label_background_activity">पृष्ठभूमि गतिविधि</string>
+    <string name="trackers">सेवाएं</string>
+    <string name="drag_and_drop">ड्रैग और ड्रॉप</string>
+    <string name="show_unread_count">अपठित गिन्ती दिखाएं</string>
+    <string name="tracking_status">ट्रैकिंग की स्तिथि</string>
+    <string name="ungrouped">असमूहीत</string>
+    <string name="comfortable_grid">कंफर्टेबल ग्रिड</string>
+    <string name="show_outline_around_covers">कवर के आसपास रूपरेख दिखाएं</string>
+    <string name="hide_category_hopper">वर्ग हॉपर को छुपाएं</string>
+    <string name="_per_row">%d प्रति पंक्ति</string>
+    <string name="hide_unread_badges">अपठित बैज छुपाएं</string>
+    <string name="show_unread_badges">अपठित बैज दिखाएं</string>
+    <string name="tap_library_to_show_filters">फिल्टर दिखाने के लिए लाइब्रेरी आइकन टैप करें</string>
+    <string name="display_as">के रूप में डिस्प्ले करें</string>
+    <string name="more_library_settings">अधिक लाइब्रेरी सेटिंग</string>
+    <string name="sort_by">सॉर्ट करें</string>
+    <string name="display_options">डिस्प्ले विकल्प</string>
+    <string name="added_">%1$s को जोड़ा गया</string>
+    <string name="restrictions_">प्रतिबंध: %1$s</string>
+    <string name="newly_added">नया जोड़ा गया</string>
+    <string name="reset_all_chapters_for_this_">%1$s के लिए सभी चैप्टर रीसेट करें</string>
+    <string name="reset_chapter_history">चैप्टर इतिहा रीसेट</string>
+    <string name="include_in_global_update">ग्लोबल अपडेट में शामिल करें</string>
+    <string name="certain_buttons_can_be_found">अगर यहा पे डिसेबल किए तोह निश्चित बटन अन्य जगह पर भी मिल जायेंगे</string>
+    <string name="search_suggestions">सर्च सुझाव</string>
+    <string name="search_tips_show_periodically">सर्च सुझाव समय समय पे दिखेंगे। सुझाव को सर्च करने के लिए लंबे समय तक प्रेस कर के रखें।</string>
+    <string name="last_read_">आखिरी पढ़ा हुआ %1$s</string>
+    <string name="view_history">इतिहास दिखाएं</string>
+    <string name="view_all_updates">सभी अपडेट दिखाएं</string>
+    <string name="auto_refresh_covers">स्वचालित कवर रिफ्रेश</string>
+    <string name="read_">%1$s पढ़े</string>
+    <string name="updated_">%1$s अपडेट किया गया</string>
+    <string name="fetched_">%1$s प्राप्त किया गया</string>
+    <string name="show_more_chapters">अधिक चैप्टर दिखाएं</string>
+    <string name="global_updates">ग्लोबल अपडेट</string>
+    <string name="recents">हाल ही के</string>
+    <string name="updates_and_history">अपडेट और इतिहास</string>
+    <string name="this_will_remove_the_read_date_for_x_question">ये \" %1$s\" की पठित तारीख मिटा देगा। क्या आप निश्चित हो?</string>
+    <string name="volume_">वॉल्यूम %1$d</string>
+    <string name="source_not_installed">सूत्र इंस्टॉल नहीं है</string>
+    <string name="extension_api_error">उपलब्ध एक्सटेंशन प्राप्त करने में असफलता</string>
+    <string name="updating_extensions">एक्सटेंशन अपडेट किए जा रहे हैं</string>
+    <string name="reading_">%1$s पढ़ा जा रहा है</string>
+    <string name="share_first_page">पहला पन्ना बाटे</string>
+    <string name="save_first_page">पहला पन्ना डाउनलोड करें</string>
+    <string name="horizontally">क्षैतिज</string>
+    <plurals name="pages_plural">
+        <item quantity="one">%1$d पन्ना</item>
+        <item quantity="other">%1$d पन्ने</item>
+    </plurals>
+    <string name="continue_reading">पढ़ना चालू रखें</string>
+    <string name="remember_this_choice">यह पसंद यादा रखें</string>
+    <string name="share_cover">कवर बाटे</string>
+    <string name="use_suggested_date">सुझाए गए तारिख का उपाय करें</string>
+    <string name="failed_to_update_">%1$s अपडेट करने में असफल</string>
+    <string name="select_sources">सूत्र चुने</string>
+    <string name="filter_languages">भाषा फिल्टर करें</string>
+    <string name="source_hidden">छिपे हुए सूत्र</string>
+    <string name="extensions_updated">एक्सटेंशन अपडेट किए गए</string>
+    <string name="about_this_">%1$s के बारे में</string>
+    <string name="continue_reading_chapter_">चैप्टर %1$s पढ़ना चालू रखें</string>
+    <string name="start_reading_chapter_">चैप्टर %1$s पढ़ना चालू करें</string>
+    <string name="newest_first">नए से पुराना</string>
+    <string name="show_download_button">डाउनलोड बटन दिखाएं</string>
+    <string name="start_reading">पढ़ना चालू करें</string>
+    <string name="add_to_library">लाइब्रेरी में जोड़े</string>
+    <string name="only_downloaded">सिर्फ डाउनलोड किए गए</string>
+    <string name="show_reset_history_button">इतिह रीसेट बटन दिखाएं</string>
+    <string name="share_second_page">दूसरा पन्ना बाटे</string>
+    <string name="all_sources">सभी सूत्र (सोर्स)</string>
+    <string name="show_updated_time">अपडेट किए गए टाइम दिखाएं</string>
+    <string name="by_day">दिन के द्वारा</string>
+    <string name="set_first_page_as_cover">पहले पन्ने को कवर रखें</string>
+    <plurals name="_updates_pending">
+        <item quantity="one">%d अपडेट बचा है</item>
+        <item quantity="other">%d अपडेट बचें है</item>
+    </plurals>
+    <string name="set_second_page_as_cover">दूसरे पन्ने को कवर रखें</string>
+    <string name="save_second_page">दूसरा पन्ना डाउनलोड करें</string>
+    <string name="share_combined_pages">संयुक्त पन्ने बाटे</string>
+    <string name="invert_double_pages">दोहरे पन्ने पलटें</string>
+    <string name="split_double_pages_portrait">पोर्ट्रेट में दोहरे पन्ने विभाजित करें</string>
+    <string name="double_pages">दोहरे पन्ने</string>
+    <string name="reset_cover">कवर रीसेट करें</string>
+    <string name="vertically">खड़ी</string>
+    <plurals name="deleted_chapters">
+        <item quantity="one">एक चैप्टर को इस सूत्र से निकाल दिया गया है :
+\n%2$s
+\nइस सूत्र के डाउनलोड को मिटाएं?</item>
+        <item quantity="other">%1$s चैप्टरों को इस सूत्र से निकाल दिया गया है :
+\n%2$s
+\n
+\nइनके डाउनलाओ को मिटाएं?</item>
+    </plurals>
+    <string name="remove_x_from_service_and_add_y">%1$s को %2$s से निकले और %3$s को जोड़े</string>
+    <string name="season_">सीजन %1$d</string>
+    <string name="installed_">%1$s इंस्टॉल किया गया</string>
+    <string name="pages_">%1$s पन्ने</string>
+    <string name="show_all">सभी दिखाएं</string>
+    <string name="no_recent_read_updated_manga">कोई हाल ही में पढ़ा अथवा अपडेट किया गया सीरीज नही है</string>
+    <string name="press_and_hold_to_also_reset">देर तक प्रेस करने से भी चैप्टर का इतीहा रीसेट होगा</string>
+    <string name="show_title_first">शीर्षक पहले दिखाएं</string>
+    <string name="a_while_ago">कुछ देर पहले</string>
+    <string name="by_series">सीरीज के द्वारा</string>
+    <string name="by_week">सप्ताह के द्वारा</string>
+    <string name="only_unread">सिर्फ अपठित</string>
+    <string name="unread_or_downloaded">अपठित अथवा डाउनलोड किए गए</string>
+    <string name="in_library">लाइब्रेरी में</string>
+    <string name="search_extensions">एक्सटेंशन खोजें…</string>
+    <string name="could_not_install_extension">एक्सटेंशन इंस्टॉल नहीं कर पाए</string>
+    <string name="split_double_pages">दोहरे पन्ने विभाजित करें</string>
+    <string name="save_combined_pages">संयुक्त पन्ने डाउनलोड करें</string>
+    <string name="single_page">अकेला पन्ना</string>
+    <string name="search_chapters">चैप्टर खोजें</string>
+    <string name="extension_updates_pending">एक्सटेंशन के अपडेट बचे हैं</string>
+    <string name="show_">%1$s दिखाए</string>
+    <string name="oldest_first">पुराने से नया</string>
+    <string name="reset_chapter_question">चैप्टर रीसेट करें?</string>
+    <string name="add_x_to_library">%1$s को लाइब्रेरी में जोड़ें?</string>
+    <plurals name="extensions_updated_plural">
+        <item quantity="one">एक्सटेंशन अपडेट हो चुका</item>
+        <item quantity="other">%d एक्सटेंशन अपडेट हो चुके</item>
+    </plurals>
 </resources>

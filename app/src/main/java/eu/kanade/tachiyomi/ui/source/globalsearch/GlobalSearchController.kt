@@ -6,26 +6,28 @@ import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
-import androidx.appcompat.widget.SearchView
 import androidx.core.view.WindowInsetsCompat.Type.systemBars
 import androidx.core.view.updatePaddingRelative
+import com.bluelinelabs.conductor.ControllerChangeHandler
+import com.bluelinelabs.conductor.ControllerChangeType
 import com.google.android.material.snackbar.Snackbar
-import com.jakewharton.rxbinding.support.v7.widget.queryTextChangeEvents
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.SourceGlobalSearchControllerBinding
 import eu.kanade.tachiyomi.source.CatalogueSource
-import eu.kanade.tachiyomi.ui.base.controller.NucleusController
-import eu.kanade.tachiyomi.ui.main.FloatingSearchInterface
+import eu.kanade.tachiyomi.ui.base.controller.BaseCoroutineController
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.main.SearchActivity
+import eu.kanade.tachiyomi.ui.main.SearchControllerInterface
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsController
 import eu.kanade.tachiyomi.ui.source.browse.BrowseSourceController
 import eu.kanade.tachiyomi.util.addOrRemoveToFavorites
 import eu.kanade.tachiyomi.util.system.rootWindowInsetsCompat
 import eu.kanade.tachiyomi.util.view.activityBinding
+import eu.kanade.tachiyomi.util.view.isControllerVisible
 import eu.kanade.tachiyomi.util.view.scrollViewWith
+import eu.kanade.tachiyomi.util.view.setOnQueryTextChangeListener
 import eu.kanade.tachiyomi.util.view.snack
 import eu.kanade.tachiyomi.util.view.toolbarHeight
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
@@ -39,9 +41,9 @@ import uy.kohesive.injekt.injectLazy
 open class GlobalSearchController(
     protected val initialQuery: String? = null,
     val extensionFilter: String? = null,
-    bundle: Bundle? = null
-) : NucleusController<SourceGlobalSearchControllerBinding, GlobalSearchPresenter>(bundle),
-    FloatingSearchInterface,
+    bundle: Bundle? = null,
+) : BaseCoroutineController<SourceGlobalSearchControllerBinding, GlobalSearchPresenter>(bundle),
+    SearchControllerInterface,
     GlobalSearchAdapter.OnTitleClickListener,
     GlobalSearchCardAdapter.OnMangaClickListener {
 
@@ -61,6 +63,7 @@ open class GlobalSearchController(
      * Snackbar containing an error message when a request fails.
      */
     private var snack: Snackbar? = null
+    private var lastPosition: Int = -1
 
     /**
      * Called when controller is initialized.
@@ -71,27 +74,17 @@ open class GlobalSearchController(
 
     override fun createBinding(inflater: LayoutInflater) = SourceGlobalSearchControllerBinding.inflate(inflater)
 
-    /**
-     * Set the title of controller.
-     *
-     * @return title.
-     */
-    override fun getTitle(): String? {
+    override fun getSearchTitle(): String? {
         return customTitle ?: presenter.query
     }
 
-    /**
-     * Create the [GlobalSearchPresenter] used in controller.
-     *
-     * @return instance of [GlobalSearchPresenter]
-     */
-    override fun createPresenter(): GlobalSearchPresenter {
-        return GlobalSearchPresenter(initialQuery, extensionFilter)
-    }
+    override val presenter = GlobalSearchPresenter(initialQuery, extensionFilter)
 
-    override fun onTitleClick(source: CatalogueSource) {
+    override fun onTitleClick(position: Int) {
+        val source = adapter?.getItem(position)?.source ?: return
         preferences.lastUsedCatalogueSource().set(source.id)
         router.pushController(BrowseSourceController(source, presenter.query).withFadeTransaction())
+        lastPosition = position
     }
 
     /**
@@ -101,13 +94,17 @@ open class GlobalSearchController(
      */
     override fun onMangaClick(manga: Manga) {
         // Open MangaController.
-        router.pushController(MangaDetailsController(manga, true).withFadeTransaction())
+        lastPosition = adapter?.currentItems?.indexOfFirst { it.source.id == manga.source } ?: -1
+        router.pushController(
+            MangaDetailsController(manga, true, shouldLockIfNeeded = activity is SearchActivity)
+                .withFadeTransaction(),
+        )
     }
 
     /**
      * Called when manga in global search is long clicked.
      *
-     * @param manga clicked item containing manga information.
+     * @param position clicked item containing manga information.
      */
     override fun onMangaLongClick(position: Int, adapter: GlobalSearchCardAdapter) {
         val manga = adapter.getItem(position)?.manga ?: return
@@ -120,12 +117,26 @@ open class GlobalSearchController(
             preferences,
             view,
             activity,
-            onMangaAdded = {
+            presenter.sourceManager,
+            this,
+            onMangaAdded = { migrationInfo ->
+                migrationInfo?.let { (source, stillFaved) ->
+                    val index = this.adapter
+                        ?.currentItems?.indexOfFirst { it.source.id == source } ?: return@let
+                    val item = this.adapter?.getItem(index) ?: return@let
+                    val oldMangaIndex = item.results?.indexOfFirst {
+                        it.manga.title.lowercase() == manga.title.lowercase()
+                    } ?: return@let
+                    val oldMangaItem = item.results.getOrNull(oldMangaIndex)
+                    oldMangaItem?.manga?.favorite = stillFaved
+                    val holder = binding.recycler.findViewHolderForAdapterPosition(index) as? GlobalSearchHolder
+                    holder?.updateManga(oldMangaIndex)
+                }
                 adapter.notifyItemChanged(position)
                 snack = view.snack(R.string.added_to_library)
             },
             onMangaMoved = { adapter.notifyItemChanged(position) },
-            onMangaDeleted = { presenter.confirmDeletion(manga) }
+            onMangaDeleted = { presenter.confirmDeletion(manga) },
         )
         if (snack?.duration == Snackbar.LENGTH_INDEFINITE) {
             (activity as? MainActivity)?.setUndoSnackBar(snack)
@@ -148,31 +159,44 @@ open class GlobalSearchController(
         inflater.inflate(R.menu.catalogue_new_list, menu)
 
         // Initialize search menu
-        val searchItem = menu.findItem(R.id.action_search)
-        val searchView = searchItem.actionView as SearchView
+        activityBinding?.searchToolbar?.setQueryHint(view?.context?.getString(R.string.global_search), false)
+        activityBinding?.searchToolbar?.searchItem?.expandActionView()
+        activityBinding?.searchToolbar?.searchView?.setQuery(presenter.query, false)
 
-        searchItem.isVisible = customTitle == null
-        searchItem.setOnActionExpandListener(
-            object : MenuItem.OnActionExpandListener {
-                override fun onMenuItemActionExpand(item: MenuItem?): Boolean {
-                    searchView.onActionViewExpanded() // Required to show the query in the view
-                    searchView.setQuery(presenter.query, false)
-                    return true
-                }
+        setOnQueryTextChangeListener(activityBinding?.searchToolbar?.searchView, onlyOnSubmit = true, hideKbOnSubmit = true) {
+            presenter.search(it ?: "")
+            setTitle() // Update toolbar title
+            true
+        }
+    }
 
-                override fun onMenuItemActionCollapse(item: MenuItem?): Boolean {
-                    return true
-                }
-            }
-        )
+    override fun onChangeStarted(handler: ControllerChangeHandler, type: ControllerChangeType) {
+        super.onChangeStarted(handler, type)
+        if (type.isEnter && isControllerVisible) {
+            val searchView = activityBinding?.searchToolbar?.searchView ?: return
+            val searchItem = activityBinding?.searchToolbar?.searchItem ?: return
+            searchItem.expandActionView()
+            searchView.setQuery(presenter.query, false)
+            searchView.clearFocus()
+        }
+        if (type == ControllerChangeType.POP_ENTER && lastPosition > -1) {
+            val holder = binding.recycler.findViewHolderForAdapterPosition(lastPosition) as? GlobalSearchHolder
+            holder?.updateAll()
+            lastPosition = -1
+        }
+    }
 
-        searchView.queryTextChangeEvents()
-            .filter { it.isSubmitted }
-            .subscribeUntilDestroy {
-                presenter.search(it.queryText().toString())
-                searchItem.collapseActionView()
-                setTitle() // Update toolbar title
-            }
+    override fun onActionViewExpand(item: MenuItem?) {
+        val searchView = activityBinding?.searchToolbar?.searchView ?: return
+        searchView.setQuery(presenter.query, false)
+    }
+
+    override fun onActionViewCollapse(item: MenuItem?) {
+        if (activity is SearchActivity) {
+            (activity as? SearchActivity)?.onBackPressedDispatcher?.onBackPressed()
+        } else if (customTitle == null) {
+            router.popCurrentController()
+        }
     }
 
     /**
@@ -186,7 +210,7 @@ open class GlobalSearchController(
 
         binding.recycler.updatePaddingRelative(
             top = (toolbarHeight ?: 0) +
-                (activityBinding?.root?.rootWindowInsetsCompat?.getInsets(systemBars())?.top ?: 0)
+                (activityBinding?.root?.rootWindowInsetsCompat?.getInsets(systemBars())?.top ?: 0),
         )
 
         // Create recycler and set adapter.
@@ -244,8 +268,8 @@ open class GlobalSearchController(
             if (results != null && searchResult.size == 1 && results.size == 1) {
                 val manga = results.first().manga
                 router.replaceTopController(
-                    MangaDetailsController(manga, true)
-                        .withFadeTransaction()
+                    MangaDetailsController(manga, true, shouldLockIfNeeded = true)
+                        .withFadeTransaction(),
                 )
                 return
             } else if (results != null) {
@@ -253,6 +277,7 @@ open class GlobalSearchController(
                 customTitle = null
                 setTitle()
                 activity?.invalidateOptionsMenu()
+                activityBinding?.appBar?.updateAppBarAfterY(binding.recycler)
             }
         }
         adapter?.updateDataSet(searchResult)

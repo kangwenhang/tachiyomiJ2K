@@ -1,10 +1,12 @@
 package eu.kanade.tachiyomi.network.interceptor
 
-import eu.kanade.tachiyomi.source.online.HttpSource
 import okhttp3.Interceptor
 import okhttp3.Response
 
-class UserAgentInterceptor : Interceptor {
+class UserAgentInterceptor(
+    private val defaultUserAgentProvider: () -> String,
+) : Interceptor {
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
 
@@ -12,7 +14,7 @@ class UserAgentInterceptor : Interceptor {
             val newRequest = originalRequest
                 .newBuilder()
                 .removeHeader("User-Agent")
-                .addHeader("User-Agent", HttpSource.DEFAULT_USER_AGENT)
+                .addHeader("User-Agent", defaultUserAgentProvider())
                 .build()
             chain.proceed(newRequest)
         } else {

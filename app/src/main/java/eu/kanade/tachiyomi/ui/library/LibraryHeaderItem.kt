@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.library
 
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import eu.davidea.flexibleadapter.FlexibleAdapter
 import eu.davidea.flexibleadapter.items.AbstractHeaderItem
 import eu.davidea.flexibleadapter.items.IFlexible
@@ -10,7 +11,7 @@ import eu.kanade.tachiyomi.data.database.models.Category
 
 class LibraryHeaderItem(
     private val categoryF: (Int) -> Category,
-    val catId: Int
+    val catId: Int,
 ) :
     AbstractHeaderItem<LibraryHeaderHolder>() {
 
@@ -20,7 +21,7 @@ class LibraryHeaderItem(
 
     override fun createViewHolder(
         view: View,
-        adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>
+        adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>,
     ): LibraryHeaderHolder {
         return LibraryHeaderHolder(view, adapter as LibraryCategoryAdapter)
     }
@@ -29,9 +30,11 @@ class LibraryHeaderItem(
         adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>,
         holder: LibraryHeaderHolder,
         position: Int,
-        payloads: MutableList<Any?>?
+        payloads: MutableList<Any?>?,
     ) {
         holder.bind(this)
+        val layoutParams = holder.itemView.layoutParams as? StaggeredGridLayoutManager.LayoutParams
+        layoutParams?.isFullSpan = true
     }
 
     val category: Category

@@ -13,16 +13,17 @@ import android.view.inputmethod.InputMethodManager
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.children
 import androidx.core.view.isVisible
-import coil.loadAny
+import coil.load
 import coil.request.Parameters
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.database.models.Manga
-import eu.kanade.tachiyomi.data.image.coil.MangaFetcher
+import eu.kanade.tachiyomi.data.image.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.image.coil.loadManga
 import eu.kanade.tachiyomi.databinding.EditMangaDialogBinding
+import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.source.LocalSource
 import eu.kanade.tachiyomi.source.icon
 import eu.kanade.tachiyomi.source.model.SManga
@@ -30,12 +31,15 @@ import eu.kanade.tachiyomi.ui.base.controller.DialogController
 import eu.kanade.tachiyomi.util.isLocal
 import eu.kanade.tachiyomi.util.lang.chop
 import eu.kanade.tachiyomi.util.system.ImageUtil
+import eu.kanade.tachiyomi.util.system.LocaleHelper
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.isInNightMode
 import eu.kanade.tachiyomi.util.system.materialAlertDialog
+import eu.kanade.tachiyomi.widget.TachiyomiTextInputEditText
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import uy.kohesive.injekt.injectLazy
 
 class EditMangaDialog : DialogController {
 
@@ -46,6 +50,7 @@ class EditMangaDialog : DialogController {
     private var willResetCover = false
 
     lateinit var binding: EditMangaDialogBinding
+    private val languages = mutableListOf<String>()
 
     private val infoController
         get() = targetController as MangaDetailsController
@@ -54,7 +59,7 @@ class EditMangaDialog : DialogController {
         Bundle()
             .apply {
                 putLong(KEY_MANGA, manga.id!!)
-            }
+            },
     ) {
         targetController = target
         this.manga = manga
@@ -90,6 +95,7 @@ class EditMangaDialog : DialogController {
         binding.mangaCover.loadManga(manga)
         val isLocal = manga.isLocal()
 
+        binding.mangaLang.isVisible = isLocal
         if (isLocal) {
             if (manga.title != manga.url) {
                 binding.title.append(manga.title)
@@ -98,6 +104,30 @@ class EditMangaDialog : DialogController {
             binding.mangaAuthor.append(manga.author ?: "")
             binding.mangaArtist.append(manga.artist ?: "")
             binding.mangaDescription.append(manga.description ?: "")
+            val preferences = infoController.presenter.preferences
+            val extensionManager: ExtensionManager by injectLazy()
+            val activeLangs = preferences.enabledLanguages().get()
+
+            languages.add("")
+            languages.addAll(
+                extensionManager.availableExtensionsFlow.value.groupBy { it.lang }.keys
+                    .sortedWith(
+                        compareBy(
+                            { it !in activeLangs },
+                            { LocaleHelper.getSourceDisplayName(it, binding.root.context) },
+                        ),
+                    )
+                    .filter { it != "all" && it != "other" },
+            )
+            binding.mangaLang.setEntries(
+                languages.map {
+                    LocaleHelper.getSourceDisplayName(it, binding.root.context)
+                },
+            )
+            binding.mangaLang.setSelection(
+                languages.indexOf(LocalSource.getMangaLang(manga, binding.root.context))
+                    .takeIf { it > -1 } ?: 0,
+            )
         } else {
             if (manga.title != manga.originalTitle) {
                 binding.title.append(manga.title)
@@ -111,6 +141,10 @@ class EditMangaDialog : DialogController {
             if (manga.description != manga.originalDescription) {
                 binding.mangaDescription.append(manga.description ?: "")
             }
+            binding.title.appendOriginalTextOnLongClick(manga.originalTitle)
+            binding.mangaAuthor.appendOriginalTextOnLongClick(manga.originalAuthor)
+            binding.mangaArtist.appendOriginalTextOnLongClick(manga.originalArtist)
+            binding.mangaDescription.appendOriginalTextOnLongClick(manga.originalDescription)
             binding.title.hint = "${resources?.getString(R.string.title)}: ${manga.originalTitle}"
             if (manga.originalAuthor != null) {
                 binding.mangaAuthor.hint = "${resources?.getString(R.string.author)}: ${manga.originalAuthor}"
@@ -122,7 +156,7 @@ class EditMangaDialog : DialogController {
                 binding.mangaDescription.hint =
                     "${resources?.getString(R.string.description)}: ${manga.originalDescription?.replace(
                         "\n",
-                        " "
+                        " ",
                     )?.chop(20)}"
             }
         }
@@ -152,7 +186,7 @@ class EditMangaDialog : DialogController {
                 R.string.clear_tags
             } else {
                 R.string.reset_tags
-            }
+            },
         )
         binding.addTagChip.setOnClickListener {
             binding.addTagChip.isVisible = false
@@ -160,30 +194,59 @@ class EditMangaDialog : DialogController {
             binding.addTagEditText.requestFocus()
             showKeyboard()
         }
+        binding.addTagEditText.setOnFocusChangeListener { v, hasFocus ->
+            if (!hasFocus && v.parent != null) {
+                addTags()
+            }
+        }
         binding.addTagEditText.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
-                val tags: List<String> = binding.mangaGenresTags.tags.toList() + binding.addTagEditText.text.toString()
-                setGenreTags(tags)
-                binding.seriesType.setSelection(manga.seriesType(customTags = tags.joinToString(", ")) - 1)
+                addTags(true)
                 binding.addTagEditText.clearFocus()
-                binding.addTagEditText.setText("")
                 hideKeyboard()
+            } else {
+                binding.addTagChip.isVisible = true
+                binding.addTagEditText.isVisible = false
             }
-            binding.addTagChip.isVisible = true
-            binding.addTagEditText.isVisible = false
             true
         }
 
         binding.resetCover.isVisible = !isLocal
         binding.resetCover.setOnClickListener {
-            binding.mangaCover.loadAny(
+            binding.mangaCover.load(
                 manga,
                 builder = {
-                    parameters(Parameters.Builder().set(MangaFetcher.realCover, true).build())
-                }
+                    parameters(Parameters.Builder().set(MangaCoverFetcher.useCustomCover, false).build())
+                },
             )
             customCoverUri = null
             willResetCover = true
+        }
+    }
+
+    private fun addTags(textCanBeBlank: Boolean = false) {
+        if ((textCanBeBlank || !binding.addTagEditText.text.isNullOrBlank()) &&
+            binding.addTagEditText.isVisible
+        ) {
+            val newTags = binding.addTagEditText.text.toString().split(",")
+                .mapNotNull { tag -> tag.trim().takeUnless { it.isBlank() } }
+            val tags: List<String> = binding.mangaGenresTags.tags.toList() + newTags
+            binding.addTagEditText.setText("")
+            setGenreTags(tags)
+            binding.seriesType.setSelection(manga.seriesType(customTags = tags.joinToString(", ")) - 1)
+            binding.addTagChip.isVisible = true
+            binding.addTagEditText.isVisible = false
+        }
+    }
+
+    private fun TachiyomiTextInputEditText.appendOriginalTextOnLongClick(originalText: String?) {
+        setOnLongClickListener {
+            if (this.text.isNullOrBlank()) {
+                this.append(originalText ?: "")
+                true
+            } else {
+                false
+            }
         }
     }
 
@@ -193,7 +256,7 @@ class EditMangaDialog : DialogController {
         inputMethodManager.showSoftInput(
             binding.addTagEditText,
             WindowManager.LayoutParams
-                .SOFT_INPUT_ADJUST_PAN
+                .SOFT_INPUT_ADJUST_PAN,
         )
     }
 
@@ -227,23 +290,23 @@ class EditMangaDialog : DialogController {
                                 dark -> 0.225f
                                 else -> 0.85f
                             }
-                            )
-                    )
+                            ),
+                    ),
                 ),
-                199
+                199,
             )
             val textColor = ColorUtils.HSLToColor(
                 floatArrayOf(
                     accentArray[0],
                     accentArray[1],
-                    if (dark) 0.945f else 0.175f
-                )
+                    if (dark) 0.945f else 0.175f,
+                ),
             )
             genres.map { genreText ->
                 val chip = LayoutInflater.from(binding.root.context).inflate(
                     R.layout.genre_chip,
                     this,
-                    false
+                    false,
                 ) as Chip
                 val id = View.generateViewId()
                 chip.id = id
@@ -257,9 +320,9 @@ class EditMangaDialog : DialogController {
                     binding.seriesType.setSelection(
                         manga.seriesType(
                             customTags = tags.joinToString(
-                                ", "
-                            )
-                        ) - 1
+                                ", ",
+                            ),
+                        ) - 1,
                     )
                 }
                 this.addView(chip)
@@ -278,8 +341,9 @@ class EditMangaDialog : DialogController {
             .toTypedArray()
 
     private fun resetTags() {
-        if (manga.genre.isNullOrBlank() || manga.source == LocalSource.ID) setGenreTags(emptyList())
-        else {
+        if (manga.genre.isNullOrBlank() || manga.isLocal()) {
+            setGenreTags(emptyList())
+        } else {
             setGenreTags(manga.getOriginalGenres().orEmpty())
             binding.seriesType.setSelection(manga.seriesType(true) - 1)
             binding.resetsReadingMode.isVisible = false
@@ -288,11 +352,12 @@ class EditMangaDialog : DialogController {
 
     fun updateCover(uri: Uri) {
         willResetCover = false
-        binding.mangaCover.loadAny(uri)
+        binding.mangaCover.load(uri)
         customCoverUri = uri
     }
 
     private fun onPositiveButtonClick() {
+        addTags()
         infoController.presenter.updateManga(
             binding.title.text.toString(),
             binding.mangaAuthor.text.toString(),
@@ -302,7 +367,8 @@ class EditMangaDialog : DialogController {
             binding.mangaGenresTags.tags,
             binding.mangaStatus.selectedPosition,
             if (binding.resetsReadingMode.isVisible) binding.seriesType.selectedPosition + 1 else null,
-            willResetCover
+            languages.getOrNull(binding.mangaLang.selectedPosition),
+            willResetCover,
         )
     }
 

@@ -5,8 +5,8 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import com.google.android.material.card.MaterialCardView
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.source.LocalSource
 import eu.kanade.tachiyomi.ui.base.holder.BaseFlexibleViewHolder
+import eu.kanade.tachiyomi.util.isLocal
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.view.setCards
 
@@ -19,7 +19,7 @@ import eu.kanade.tachiyomi.util.view.setCards
 
 abstract class LibraryHolder(
     view: View,
-    val adapter: LibraryCategoryAdapter
+    val adapter: LibraryCategoryAdapter,
 ) : BaseFlexibleViewHolder(view, adapter) {
 
     protected val color = ColorUtils.setAlphaComponent(itemView.context.getResourceColor(R.attr.colorSecondary), 75)
@@ -51,12 +51,12 @@ abstract class LibraryHolder(
             },
             when {
                 item.downloadCount == -1 -> -1
-                item.manga.source == LocalSource.ID -> -2
+                item.manga.isLocal() -> -2
                 else -> item.downloadCount
             },
             showTotal,
             item.sourceLanguage,
-            this is LibraryGridHolder
+            this is LibraryGridHolder,
         )
     }
 

@@ -20,7 +20,20 @@ class DbOpenCallback : SupportSQLiteOpenHelper.Callback(DATABASE_VERSION) {
         /**
          * Version of the database.
          */
-        const val DATABASE_VERSION = 14
+        const val DATABASE_VERSION = 17
+    }
+
+    override fun onOpen(db: SupportSQLiteDatabase) {
+        super.onOpen(db)
+        setPragma(db, "foreign_keys = ON")
+        setPragma(db, "journal_mode = WAL")
+        setPragma(db, "synchronous = NORMAL")
+    }
+
+    private fun setPragma(db: SupportSQLiteDatabase, pragma: String) {
+        val cursor = db.query("PRAGMA $pragma")
+        cursor.moveToFirst()
+        cursor.close()
     }
 
     override fun onCreate(db: SupportSQLiteDatabase) = with(db) {
@@ -46,7 +59,7 @@ class DbOpenCallback : SupportSQLiteOpenHelper.Callback(DATABASE_VERSION) {
             // Fix kissmanga covers after supporting cloudflare
             db.execSQL(
                 """UPDATE mangas SET thumbnail_url =
-                    REPLACE(thumbnail_url, '93.174.95.110', 'kissmanga.com') WHERE source = 4"""
+                    REPLACE(thumbnail_url, '93.174.95.110', 'kissmanga.com') WHERE source = 4""",
             )
         }
         if (oldVersion < 3) {
@@ -89,6 +102,18 @@ class DbOpenCallback : SupportSQLiteOpenHelper.Callback(DATABASE_VERSION) {
         }
         if (oldVersion < 14) {
             db.execSQL(MangaTable.addFilteredScanlators)
+        }
+        if (oldVersion < 15) {
+            db.execSQL(TrackTable.renameTableToTemp)
+            db.execSQL(TrackTable.createTableQuery)
+            db.execSQL(TrackTable.insertFromTempTable)
+            db.execSQL(TrackTable.dropTempTable)
+        }
+        if (oldVersion < 16) {
+            db.execSQL(MangaTable.addUpdateStrategy)
+        }
+        if (oldVersion < 17) {
+            db.execSQL(TrackTable.updateMangaUpdatesScore)
         }
     }
 

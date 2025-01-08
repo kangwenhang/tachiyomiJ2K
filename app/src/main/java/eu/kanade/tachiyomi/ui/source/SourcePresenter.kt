@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.source
 
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
+import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.LocalSource
 import eu.kanade.tachiyomi.source.SourceManager
@@ -8,6 +9,7 @@ import eu.kanade.tachiyomi.util.system.withUIContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -25,7 +27,8 @@ import java.util.TreeMap
 class SourcePresenter(
     val controller: BrowseController,
     val sourceManager: SourceManager = Injekt.get(),
-    private val preferences: PreferencesHelper = Injekt.get()
+    val extensionManager: ExtensionManager = Injekt.get(),
+    private val preferences: PreferencesHelper = Injekt.get(),
 ) {
 
     private var scope = CoroutineScope(Job() + Dispatchers.Default)
@@ -66,7 +69,7 @@ class SourcePresenter(
                     else -> d1.compareTo(d2)
                 }
             }
-            val byLang = sources.groupByTo(map, { it.lang })
+            val byLang = sources.groupByTo(map) { it.lang }
             sourceItems = byLang.flatMap {
                 val langItem = LangItem(it.key)
                 it.value.map { source ->
@@ -94,6 +97,7 @@ class SourcePresenter(
     private fun loadLastUsedSource() {
         lastUsedJob?.cancel()
         lastUsedJob = preferences.lastUsedCatalogueSource().asFlow()
+            .drop(1)
             .onEach {
                 lastUsedItem = getLastUsedSource(it)
                 withUIContext {
@@ -106,8 +110,11 @@ class SourcePresenter(
         return (sourceManager.get(value) as? CatalogueSource)?.let { source ->
             val pinnedCatalogues = preferences.pinnedCatalogues().get()
             val isPinned = source.id.toString() in pinnedCatalogues
-            if (isPinned) null
-            else SourceItem(source, null, isPinned)
+            if (isPinned) {
+                null
+            } else {
+                SourceItem(source, LangItem(LAST_USED_KEY), isPinned)
+            }
         }
     }
 
@@ -131,10 +138,9 @@ class SourcePresenter(
         val hiddenCatalogues = preferences.hiddenSources().get()
 
         return sourceManager.getCatalogueSources()
-            .filter { it.lang in languages }
+            .filter { it.lang in languages || it.id == LocalSource.ID }
             .filterNot { it.id.toString() in hiddenCatalogues }
-            .sortedBy { "(${it.lang}) ${it.name}" } +
-            sourceManager.get(LocalSource.ID) as LocalSource
+            .sortedBy { "(${it.lang}) ${it.name}" }
     }
 
     companion object {
@@ -143,5 +149,10 @@ class SourcePresenter(
 
         private var lastSources: List<SourceItem>? = null
         private var lastUsedItemRem: SourceItem? = null
+
+        fun onLowMemory() {
+            lastSources = null
+            lastUsedItemRem = null
+        }
     }
 }

@@ -1,23 +1,29 @@
 package eu.kanade.tachiyomi.util.lang
 
 import android.content.Context
-import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.SpannedString
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
-import android.text.style.RelativeSizeSpan
-import android.text.style.StyleSpan
-import android.text.style.SuperscriptSpan
+import android.text.style.TextAppearanceSpan
 import androidx.annotation.ColorInt
 import androidx.annotation.StringRes
+import androidx.core.text.bold
+import androidx.core.text.buildSpannedString
+import androidx.core.text.color
+import androidx.core.text.inSpans
+import androidx.core.text.parseAsHtml
+import androidx.core.text.scale
+import androidx.core.text.superscript
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import net.greypanther.natsort.CaseInsensitiveSimpleNaturalComparator
 import java.net.URI
 import java.net.URISyntaxException
+import java.util.Locale
 import kotlin.math.floor
 
 /**
@@ -84,8 +90,16 @@ fun String.truncateCenter(count: Int, replacement: String = "..."): String {
 }
 
 fun String.capitalizeWords(): String {
-    val firstReplace = split(" ").joinToString(" ") { it.capitalize() }
-    return firstReplace.split("-").joinToString("-") { it.capitalize() }
+    val firstReplace = split(" ").joinToString(" ") {
+        it.replaceFirstChar { text ->
+            text.titlecase(Locale.getDefault())
+        }
+    }
+    return firstReplace.split("-").joinToString("-") {
+        it.replaceFirstChar { text ->
+            text.titlecase(Locale.getDefault())
+        }
+    }
 }
 
 /**
@@ -111,6 +125,21 @@ fun String.highlightText(highlight: String, @ColorInt color: Int): Spanned {
     return wordToSpan
 }
 
+fun String.asButton(context: Context, disabled: Boolean = false): SpannedString {
+    return buildSpannedString {
+        val buttonSpan: SpannableStringBuilder.() -> Unit = {
+            inSpans(
+                TextAppearanceSpan(context, R.style.TextAppearance_Tachiyomi_Button),
+            ) { append(this@asButton) }
+        }
+        if (disabled) {
+            color(context.getColor(R.color.material_on_surface_disabled), buttonSpan)
+        } else {
+            buttonSpan()
+        }
+    }
+}
+
 fun String.indexesOf(substr: String, ignoreCase: Boolean = true): List<Int> {
     val list = mutableListOf<Int>()
     if (substr.isBlank()) return list
@@ -125,8 +154,14 @@ fun String.indexesOf(substr: String, ignoreCase: Boolean = true): List<Int> {
     }
 }
 
+fun String.withColor(@ColorInt colorInt: Int) =
+    buildSpannedString { color(colorInt) { append(this@withColor) } }
+
 fun String.withSubtitle(context: Context, @StringRes subtitleRes: Int) =
     withSubtitle(context, context.getString(subtitleRes))
+
+fun String.withSubtitle(subtitle: Spanned): Spanned =
+    SpannableStringBuilder(this + "\n").append(subtitle)
 
 fun String.withSubtitle(context: Context, subtitle: String): Spanned {
     val spannable = SpannableStringBuilder(this + "\n" + subtitle)
@@ -134,19 +169,21 @@ fun String.withSubtitle(context: Context, subtitle: String): Spanned {
         ForegroundColorSpan(context.getResourceColor(android.R.attr.textColorSecondary)),
         this.length + 1,
         spannable.length,
-        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
     )
     return spannable
 }
 
-fun String.addBetaTag(context: Context): Spanned {
+fun String.addBetaTag(context: Context, useSuperScript: Boolean = true): Spanned {
     val betaText = context.getString(R.string.beta)
-    val betaSpan = SpannableStringBuilder(this + betaText)
-    betaSpan.setSpan(SuperscriptSpan(), length, length + betaText.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-    betaSpan.setSpan(RelativeSizeSpan(0.75f), length, length + betaText.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-    betaSpan.setSpan(StyleSpan(Typeface.BOLD), length, length + betaText.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-    betaSpan.setSpan(ForegroundColorSpan(context.getResourceColor(R.attr.colorSecondary)), length, length + betaText.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-    return betaSpan
+    val colorS = context.getResourceColor(R.attr.colorSecondary)
+    return buildSpannedString {
+        append(this@addBetaTag)
+        val buttonSpan: SpannableStringBuilder.() -> Unit = {
+            bold { scale(0.75f) { color(colorS) { append(betaText) } } }
+        }
+        if (useSuperScript) superscript(buttonSpan) else buttonSpan()
+    }
 }
 
 fun String.toNormalized(): String = replace("’", "'")
@@ -165,4 +202,11 @@ fun String.getUrlWithoutDomain(): String {
     } catch (e: URISyntaxException) {
         this
     }
+}
+
+/**
+ * HTML-decode the string
+ */
+fun String.htmlDecode(): String {
+    return this.parseAsHtml().toString()
 }

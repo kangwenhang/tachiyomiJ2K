@@ -5,7 +5,7 @@
     <!--Models-->
     <!-- Manga Type -->
     <string name="manga">Manga</string>
-    <string name="manhwa">Manhwa</string>
+    <string name="manhwa">Manhwa •</string>
     <string name="manhua">Manhua</string>
     <string name="comic">Komiks</string>
     <string name="webtoon">Webtoon</string>
@@ -26,7 +26,7 @@
     <!-- Security -->
     <string name="unlock_library">Odblokuj aby uzyskać dostęp do biblioteki</string>
     <string name="unlock">Odblokuj</string>
-    <string name="lock_with_biometrics">Zablokuj za pomocą biometrii</string>
+    <string name="lock_with_biometrics">Wymagaj odblokowania</string>
     <string name="lock_when_idle">Zablokuj podczas bezczynności</string>
     <!-- Chapters -->
     <string name="chapters">Rozdziały</string>
@@ -49,10 +49,10 @@
         <item quantity="other">Usunąć %1$d pobranych rozdziałów?</item>
     </plurals>
     <plurals name="chapters_plural">
-        <item quantity="one">%1$d rozdział</item>
-        <item quantity="few">%1$d rozdziały</item>
-        <item quantity="many">%1$d rozdziałów</item>
-        <item quantity="other">%1$d rozdziałów</item>
+        <item quantity="one">%1$s rozdział</item>
+        <item quantity="few">%1$s rozdziały</item>
+        <item quantity="many">%1$s rozdziałów</item>
+        <item quantity="other">%1$s rozdziałów</item>
     </plurals>
     <plurals name="pages_left">
         <item quantity="one">Pozostała %1$d strona</item>
@@ -67,11 +67,7 @@
     <string name="_already_in_queue">%1$s jest już w kolejce</string>
     <string name="create_new_category">Stwórz nową kategorię</string>
     <string name="category_is_empty">Kategoria jest pusta</string>
-    <string name="top_category">Pierwsza kategoria (%1$s)</string>
     <string name="default_category">Domyślna kategoria</string>
-    <string name="first_category">Pierwsza kategoria</string>
-    <string name="categories_on_manual">Kategorie do aktualizacji podczas ręcznego odświeżania</string>
-    <string name="categories_in_global_update">Wszystkie kategorie w aktualizacji globalnej</string>
     <string name="confirm_category_deletion">Usunąć kategorię?</string>
     <string name="confirm_category_deletion_message">Mangi z tej kategorii będą przeniesione do domyślnej kategorii.</string>
     <string name="already_in_category">Manga jest już w kategorii</string>
@@ -91,7 +87,6 @@
     <string name="jump_to_category">Przejdź do kategorii</string>
     <!-- Updates -->
     <string name="update">Aktualizuj</string>
-    <string name="what_should_update">Co aktualizować?</string>
     <string name="updating_">Aktualizowanie %1$s</string>
     <string name="update_available">Aktualizacja dostępna</string>
     <string name="new_version_available">Nowa wersja dostępna!</string>
@@ -103,7 +98,6 @@
     <string name="updating_library">Aktualizowanie biblioteki</string>
     <string name="selected_">Wybrano: %1$d</string>
     <string name="local">Lokalne</string>
-    <string name="remove_from_library_question">Usunąć z biblioteki?</string>
     <string name="library_search_hint">Wyszukaj tytuł, tagi, źródła</string>
     <string name="library_is_empty_add_from_browse">Twoja biblioteka jest pusta, dodaj coś do swojej biblioteki z zakładki Przeglądaj.</string>
     <string name="no_matches_for_filters">Nie znaleziono wyników dla aktualnie wybranych filtrów</string>
@@ -124,7 +118,6 @@
     <string name="total_chapters">Ilość rozdziałów</string>
     <string name="date_added">Data dodania</string>
     <string name="last_read">Ostatnio czytane</string>
-    <string name="last_updated">Ostatnio zaktualizowane</string>
     <string name="latest_chapter">Najnowszy rozdział</string>
     <string name="drag_and_drop">Przeciągnij i upuść</string>
     <!-- Library Display -->
@@ -153,18 +146,10 @@
         <item quantity="many">i %1$d rozdziałów więcej</item>
         <item quantity="other">i %1$d rozdziałów więcej</item>
     </plurals>
-    <plurals name="notification_update_failed">
-        <item quantity="one">1 aktualizacja nieudana</item>
-        <item quantity="few">%1$d aktualizacje nieudane</item>
-        <item quantity="many">%1$d aktualizacji nieudanych</item>
-        <item quantity="other">%1$d aktualizacji nieudanych</item>
-    </plurals>
     <!-- Library settings -->
     <string name="library_update_frequency">Częstotliwość aktualizowania biblioteki</string>
-    <string name="library_update_order">Kolejność aktualizacji biblioteki</string>
-    <string name="library_update_restriction">Ograniczenia aktualizacji biblioteki</string>
+    <string name="library_update_restriction">Ograniczenia urządzenia</string>
     <string name="library_update_restriction_summary">Aktualizuj tylko kiedy spełnione są te warunki</string>
-    <string name="only_update_ongoing">Aktualizuj tylko nieukończone mangi</string>
     <string name="sort_by_ignoring_articles">Sortuj ignorując przedimki</string>
     <string name="when_sorting_ignore_articles">Podczas alfabetycznego sortowania, sortuj ignorując angielskie przedimki (a, an, the) rozpoczynające tytuły mang</string>
     <string name="categories_to_include_in_global_update">Kategorie zawarte w globalnej aktualizacji</string>
@@ -179,8 +164,6 @@
     <string name="recent_updates">Ostatnie aktualizacje</string>
     <string name="this_will_remove_the_read_date_for_x_question">Ta czynność usunie datę przeczytania z
         \"%1$s\". Kontynuować?</string>
-    <string name="this_will_remove_the_read_date_question">Ta czynność usunie datę przeczytania z tego
-        rozdziału. Kontynuować?</string>
     <string name="reset_all_chapters_for_this_">Zresetuj wszystkie rozdziały dla %1$s</string>
     <string name="last_read_">Wcześniej czytano %1$s</string>
     <string name="read_">Czytano %1$s</string>
@@ -260,7 +243,7 @@
     <string name="double_tap_anim_speed">Szybkość animacji podwójnego dotknięcia</string>
     <string name="show_page_number">Pokazuj numer strony</string>
     <string name="true_32bit_color">Kolor 32-bitowy</string>
-    <string name="reduces_banding_impacts_performance">Ogranicza banding, ale wpływa na wydajność</string>
+    <string name="reduces_banding_impacts_performance">Ogranicza banding, ale może mieć wpływ na wydajność</string>
     <string name="crop_borders">Przycinaj krawędzie</string>
     <string name="use_custom_brightness">Niestandardowa jasność</string>
     <string name="use_custom_color_filter">Niestandardowy filtr kolorów</string>
@@ -276,7 +259,6 @@
     <string name="navigation">Nawigacja</string>
     <string name="volume_keys">Przyciski głośności</string>
     <string name="invert_volume_keys">Odwróć przyciski głośności</string>
-    <string name="tapping">Stukanie</string>
     <string name="background_color">Kolor tła</string>
     <string name="white">Biały</string>
     <string name="black">Czarny</string>
@@ -329,8 +311,6 @@
     <string name="select_starting_chapter">Wybierz początkowy rozdział</string>
     <string name="select_ending_chapter">Wybierz końcowy rozdział</string>
     <string name="search_chapters">Przeszukaj rozdziały</string>
-    <string name="next_unread_chapter">Następny nieprzeczytany rozdział</string>
-    <string name="next_5_unread">Następne 5 nieprzeczytanych</string>
     <string name="custom_range">Własny zakres</string>
     <string name="all_chapters">Wszystkie rozdziały</string>
     <string name="all_unread_chapters">Wszystkie nieprzeczytane</string>
@@ -376,7 +356,6 @@
     <string name="tracked">Śledzone</string>
     <string name="not_tracked">Nieśledzone</string>
     <string name="services">Usługi śledzenia</string>
-    <string name="sync_chapters_after_reading">Aktualizuj postęp po przeczytaniu rozdziału</string>
     <string name="reading">Czytane</string>
     <string name="currently_reading">Teraz czytane</string>
     <string name="dropped">Porzucone</string>
@@ -389,7 +368,6 @@
     <string name="status">Status</string>
     <string name="started">Rozpoczęto</string>
     <string name="type">Typ</string>
-    <string name="url_not_set_click_again">URL mangi nie jest ustawiony, kliknij tytuł i wybierz mangę jeszcze raz</string>
     <string name="refresh_tracking">Odśwież śledzenie</string>
     <string name="add_tracking">Dodaj śledzenie</string>
     <string name="remove_tracking">Usuń śledzenie z aplikacji</string>
@@ -434,7 +412,7 @@
     <string name="skipping_">(pomijanie %1$d)</string>
     <plurals name="manga_migrated">
         <item quantity="one">%d manga zmigrowana</item>
-        <item quantity="few">%d mangi zmigrowana</item>
+        <item quantity="few">%d mangi zmigrowane</item>
         <item quantity="many">%d mang zmigrowanych</item>
         <item quantity="other">%d mang zmigrowanych</item>
     </plurals>
@@ -464,9 +442,9 @@
     <string name="restore_from_backup_file">Przywraca bibliotekę z pliku kopii zapasowej</string>
     <string name="backup_location">Lokalizacja kopii zapasowych</string>
     <string name="backup_frequency">Częstotliwość tworzenia kopii</string>
-    <string name="max_auto_backups">Maks. ilosć kopii automatycznych</string>
+    <string name="max_auto_backups">Maks. ilość kopii automatycznych</string>
     <string name="backup_failed">Tworzenie kopii nie powiodło się</string>
-    <string name="backup_created">Kopia zapasowa utworzona</string>
+    <string name="backup_created">Utworzono kopię zapasową</string>
     <string name="restore_completed">Przywracanie ukończone</string>
     <string name="restore_error">Nieudane przywrócenie kopii zapasowej</string>
     <string name="creating_backup">Tworzenie kopii zapasowej</string>
@@ -485,12 +463,12 @@
         <item quantity="many">Pamięć podręczna wyczyszczona. %d plików zostało usuniętych</item>
         <item quantity="other">Pamięć podręczna wyczyszczona. %d plików zostało usuniętych</item>
     </plurals>
-    <string name="cache_delete_error">Podczas czyszczenia pamięci podręcznej wystąpił błąd</string>
+    <string name="cache_delete_error">Podczas czyszczenia wystąpił błąd</string>
     <string name="clear_cookies">Usuń ciasteczka</string>
     <string name="cookies_cleared">Ciasteczka usunięte</string>
     <string name="clear_database">Wyczyść bazę danych</string>
-    <string name="clear_database_summary">Usuń mangi i rozdziały, których nie ma w twojej bibliotece</string>
-    <string name="clear_database_confirmation">Na pewno? Przeczytane rozdziały i postęp w mangach spoza biblioteki zostaną utracone</string>
+    <string name="clear_database_summary">Usuń historię wpisów, których nie ma w twojej bibliotece</string>
+    <string name="clear_database_confirmation">Na pewno\? Przeczytane rozdziały i postęp w wpisach spoza biblioteki zostaną utracone</string>
     <string name="clear_database_completed">Pozycje usunięte</string>
     <string name="refresh_library_metadata">Odśwież metadane biblioteki</string>
     <string name="updates_covers_genres_desc">Aktualizuje okładki, gatunki, opisy i informacje o statusie mang</string>
@@ -619,7 +597,7 @@
     <string name="center">Od środka</string>
     <string name="charging">Ładowanie</string>
     <string name="clear">Wyczyść</string>
-    <string name="close">Wyjdź</string>
+    <string name="close">Zamknij</string>
     <string name="common">Zwykły</string>
     <string name="cover_of_image">Okładka mangi</string>
     <string name="create">Stwórz</string>
@@ -685,7 +663,6 @@
     <string name="unknown_error">Nieznany błąd</string>
     <string name="unpin">Odepnij</string>
     <string name="use_default">Użyj domyślnych</string>
-    <string name="view_all_errors">Wyświetl wszystkie błędy</string>
     <string name="view_chapters">Wyświetl rozdziały</string>
     <string name="wifi">Wi-Fi</string>
     <string name="mark_as_unread">Oznacz jako nieprzeczytane</string>
@@ -701,10 +678,8 @@
     <string name="locale">Język</string>
     <string name="no_chapters_error">Nie znaleziono rozdziałów</string>
     <string name="badges">Plakietki</string>
-    <string name="unofficial_extension_message">Te rozszerzenie nie jest na liście oficjalnych rozszerzeń Tachiyomi.</string>
     <string name="open_log">Otwórz log</string>
     <string name="nsfw_short">18+</string>
-    <string name="unofficial">Nieoficjalne</string>
     <string name="may_contain_nsfw">Może zawierać zawartość NSFW (18+)</string>
     <string name="next_page">Następna strona</string>
     <string name="previous_page">Poprzednia strona</string>
@@ -712,24 +687,19 @@
     <string name="previous_chapter">Poprzedni rozdział</string>
     <string name="animate_page_transitions">Animacje przejścia stron</string>
     <string name="default_reading_mode">Domyślny styl czytania</string>
-    <string name="nav_layout">Styl nawigacji</string>
     <string name="l_nav">W kształcie litery \"L\"</string>
     <string name="kindlish_nav">Podobnie jak w czytniku Kindle</string>
     <string name="edge_nav">Przy krawędzi</string>
     <string name="right_and_left_nav">Prawa i Lewa</string>
-    <string name="invert_tapping">Odwróć stuknięcia</string>
+    <string name="invert_tapping">Odwróć strefy kliknięcia</string>
     <string name="none">Brak</string>
     <string name="automatic_backups">Automatyczna kopia zapasowa</string>
     <string name="invalid_backup_file">Nieprawidłowy plik kopii zapasowej</string>
     <string name="invalid_backup_file_type">Nieprawidłowe rozszczerzenie pliku kopii zapasowej: %1$s
 \nPowinno być .proto.gz albo .json.</string>
-    <string name="file_is_missing_data">W pliku brakuje danych.</string>
     <string name="backup_has_no_manga">Kopia zapasowa nie zawiera żadnych mang.</string>
     <string name="restore_missing_sources">Brakujące źródła:</string>
     <string name="restore_missing_trackers">Serwisy, do których nie zalogowono:</string>
-    <string name="restore_content">Przywracanie używa źródeł do pobierania danych, operator może naliczać dodatkowe opłaty.
-\n
-\nPrzed przywróceniem upewnij się, że zainstalowane są odpowiednie rozszerzenia i że zalogowano się do źródeł i usług śledzenia.</string>
     <string name="restoring_backup_canceled">Anulowano przywracanie</string>
     <string name="restore_duration">%02d min, %02d s</string>
     <plurals name="restore_completed_message">
@@ -783,7 +753,6 @@
     <string name="hide_unread_badges">Ukryj plakietki nieprzeczytanych</string>
     <string name="enable">Włącz</string>
     <string name="add_edit_categories">Dodaj/Edytuj kategorie</string>
-    <string name="hide_app_block_screenshots">Ukryj zawartość ekranu przy przełączaniu między aplikacjami i blokuj zrzuty ekranu</string>
     <string name="label_global_search">Wyszukiwanie globalne</string>
     <string name="disabled">Wyłączone</string>
     <string name="cancel_all_for_series">Anuluj wszystko dla tego tytułu</string>
@@ -900,15 +869,12 @@
     <string name="incognito_mode">tryb Incognito</string>
     <string name="turn_off_">Wyłącz %s</string>
     <string name="turn_on_">Włącz %s</string>
-    <string name="only_applies_silent_trackers">Dotyczy tylko cichych trackerów, takich jak Komga</string>
-    <string name="track_when_adding_to_library">Śledź w momencie dodawania do biblioteki</string>
     <plurals name="pages_plural">
         <item quantity="one">%1$d strona</item>
         <item quantity="few">%1$d strony</item>
         <item quantity="many">%1$d stron</item>
         <item quantity="other">%1$d stron</item>
     </plurals>
-    <string name="save_pages_separately">Zapisuj strony w osobnych folderach</string>
     <string name="show_on_long_press">Pokaż po przytrzymaniu</string>
     <string name="actions">Akcje</string>
     <string name="automatic_orientation">Automatyczny (na podstawie orientacji)</string>
@@ -944,7 +910,7 @@
     <string name="global_updates">Globalne aktualizacje</string>
     <string name="show_number_of_items">Pokaż liczbę elementów</string>
     <plurals name="missing_chapters_warning">
-        <item quantity="one">Jeden brakujący rozdział</item>
+        <item quantity="one">%d brakujący rozdział</item>
         <item quantity="few">%d brakujące rozdziały</item>
         <item quantity="many">%d brakujących rozdziałów</item>
         <item quantity="other">%d brakujących rozdziałów</item>
@@ -985,12 +951,11 @@
     <string name="remove_x_from_service_and_add_y">Usuń %1$s z %2$s i dodaj %3$s</string>
     <string name="remove_previous_tracker">Usunąć wcześniejsze śledzenie\?</string>
     <string name="no_match_found">Nie znaleziono pasującego wyniku</string>
-    <string name="create_folders_by_manga_title">Tworzy foldery zgodnie z tytułem mangi</string>
     <string name="crop_borders_paged">Przycinaj krawędzie (Strony)</string>
     <string name="some_extensions_may_prompt">Niektóre rozszerzenia mogą nadal prosić o zainstalowanie.</string>
     <string name="getting_started_guide">Wprowadzenie - poradnik</string>
     <string name="restrictions_">Ograniczenia: %1$s</string>
-    <string name="doh">DNS over HTTPS</string>
+    <string name="doh">DNS przez HTTPS</string>
     <string name="a_calmer_you">Spokój Ducha (Dynamiczny)</string>
     <string name="a_brighter_you">Pogoda Ducha (Dynamiczny)</string>
     <string name="flat_lime">Zwykła Limonka</string>
@@ -1008,21 +973,213 @@
     <string name="log_out_from_">Wylogować z %1$s\?</string>
     <string name="keep_in_">Zostaw w %1$s</string>
     <string name="show_in_sources_and_extensions">Pokazuj na liście źródeł i rozszerzeń</string>
-    <string name="notification_size_warning">Duże aktualizacje biblioteki mogą prowadzić do zwiększonego zużycia baterii oraz spowolnienia działania źródeł</string>
+    <string name="notification_size_warning">Duże aktualizacje biblioteki mogą prowadzić do zwiększonego zużycia baterii oraz spowolnienia działania źródeł.</string>
     <string name="show_outline_around_covers">Pokaż obrys wokół okładek</string>
     <string name="ext_installer_shizuku_stopped">Shizuku nie jest aktywne</string>
     <string name="ext_installer_shizuku_unavailable_dialog">Zainstaluj i uruchom Shizuku, aby używać go jako instalatora rozszerzeń.</string>
-    <string name="use_shizuku_to_install">Używaj Shizuku do instalowania rozszerzeń</string>
-    <string name="use_shizuku_summary">Umożliwia instalowanie rozszerzeń bez wyświetlania monitów oraz pozwala na automatyczne aktualizacje dla urządzeń pracujących na systemie starszym niż Android 12</string>
     <string name="classic_blue">Klasyczny Niebieski</string>
     <string name="lime_time">Pora na Limonkę</string>
-    <string name="download_queue_size_warning">Ostrzeżenie: duża ilość zakolejkowanych pobrań może doprowadzić do spowolnienia źródeł i/lub zablokowania Tachiyomi</string>
+    <string name="download_queue_size_warning">Ostrzeżenie: Duże aktualizacje biblioteki mogą prowadzić do zwiększonego zużycia baterii oraz spowolnienia działania źródeł.</string>
     <string name="every_3_days">Co 3 dni</string>
-    <string name="save_chapters_as_cbz">Zapisz rozdziały jako CBZ</string>
+    <string name="save_chapters_as_cbz">Zapisz jako archiwum CBZ</string>
     <string name="cancelled">Anulowane</string>
     <string name="publishing_finished">Opublikowane w całości</string>
     <string name="on_hiatus">Przerwa wydawnicza</string>
     <string name="tracking_info">Przesyłanie postępu czytania do zewnętrznego serwisu. Ustaw śledzenie guzikiem \"Śledzenie\" w wybranych tytułach.</string>
     <string name="enhanced_services">Ulepszone usługi śledzenia</string>
     <string name="enhanced_tracking_info">Usługi dostarczania ulepszonych funkcji dla niektórych źródeł. Mangi po dodaniu do biblioteki są automatycznie śledzone.</string>
+    <string name="order_by">Sortowanie</string>
+    <string name="grayscale">Odcienie szarości</string>
+    <string name="local_invalid_format">Błędny format rozdziału</string>
+    <string name="navigate_pan">Dotknij aby przesunąć</string>
+    <string name="pref_inverted_colors">Odwrócone</string>
+    <string name="ascending">Rosnąco</string>
+    <string name="date">Data</string>
+    <string name="descending">Malejąco</string>
+    <string name="clear_database_source_item_count">%1$d wpisów spoza biblioteki w bazie danych</string>
+    <string name="database_clean">Baza danych wyczyszczona</string>
+    <string name="confirm_manga_add_duplicate">W swojej bibliotece posiadasz wpis o tej samej nazwie lecz z innego źródła(%1$s).
+\n
+\nCzy nadal chcesz kontynuować\?</string>
+    <string name="select_inverse">Odwróć zaznaczenie</string>
+    <string name="cover_only_grid">Siatka z samych okładek</string>
+    <string name="skipped_reason_completed">Pominięto, ponieważ seria została ukończona</string>
+    <string name="skipped_reason_not_caught_up">Pominięto, ponieważ istnieją nieprzeczytane rozdziały</string>
+    <string name="skipped_reason_not_started">Pominięto, ponieważ brak przeczytanych rozdziałów</string>
+    <string name="channel_skipped">Pominięty</string>
+    <string name="tap_to_see_details">Kliknij, by wyświetlić detale</string>
+    <string name="clear_history">Wyczyść historię</string>
+    <string name="clear_history_completed">Historia usunięta</string>
+    <string name="clear_history_confirmation">Jesteś pewien\? CAŁA historia zostanie usunięta.</string>
+    <string name="backup_restore_invalid_uri">Błąd: pusty URI</string>
+    <string name="backup_info">Automatyczne kopie zapasowe są wysoce zalecane. Radzimy również przechowywać kopie w innych miejscach.</string>
+    <string name="new_beta_version_available">Dostępna jest nowa wersja beta!</string>
+    <string name="language_badge">Odznaki językowe</string>
+    <string name="show_">Pokaż %1$s</string>
+    <string name="must_view_details_before_migration">Aby móc migrować, należy wyświetlić stronę ze szczegółami tego wpisu</string>
+    <string name="use_staggered_grid">Użyj siatki z przesunięciem</string>
+    <string name="notification_update_error">%1$d aktualizacja (aktualizacje) nie powiodła się</string>
+    <string name="notification_update_skipped">%1$d pominięto aktualizację(-e)</string>
+    <string name="pref_library_update_manga_restriction">Pomiń aktualizowanie tytułów</string>
+    <string name="pref_update_only_completely_read">Posiada nieprzeczytane rozdziały</string>
+    <string name="pref_update_only_non_completed">Ukończone serie</string>
+    <string name="pref_update_only_started">Brak przeczytanych rozdziałów</string>
+    <string name="pref_update_only_completely_read_summary">Aktualizuj tytuł tylko wtedy, gdy nie ma żadnego nieprzeczytanego rozdziału (całkowicie przeczytany)</string>
+    <string name="scoring_type_updated">Zaktualizowano typ punktacji</string>
+    <string name="could_not_update_scoring_">Nie można zaktualizować typu punktacji: %1$s</string>
+    <string name="update_tracking_after_reading">Aktualizacja śledzenia po przeczytaniu</string>
+    <string name="update_tracking_marked_read">Aktualizuj śledzenie po oznaczeniu jako przeczytane</string>
+    <string name="move_series_to_top">Przenieś serię na górę</string>
+    <string name="pref_manage_notifications">Zarządzaj powiadomieniami</string>
+    <string name="faq_and_guides">FAQ i poradniki</string>
+    <string name="secure_screen_summary">Ukrywa zawartość ekranu przy przełączaniu między aplikacjami i blokuj zrzuty ekranu</string>
+    <string name="pref_highest">Najwyższy</string>
+    <string name="pref_hide_threshold">Czułość ukrywania dolnego paska podczas przewijania</string>
+    <string name="pref_high">Wysokie</string>
+    <string name="pref_low">Niskie</string>
+    <string name="pref_lowest">Najniższe</string>
+    <string name="check_for_beta_releases">Sprawdź wydania beta</string>
+    <string name="try_new_features">Wypróbuj nowe funkcje zanim będą oficjalnie wydane. Wydania beta mogą być niestabilne i są dostarczane by dać feedback developerowi.</string>
+    <plurals name="next_unread_chapters">
+        <item quantity="one">Następny nieprzeczytany rozdział</item>
+        <item quantity="few">Następne %d nieprzeczytane rozdziały</item>
+        <item quantity="many">Następne %d nieprzeczytanych rozdziałów</item>
+        <item quantity="other">Następne %d nieprzeczytanych rozdziałów</item>
+    </plurals>
+    <string name="sort_fetched_time">Sortuj przez czas pobrania</string>
+    <string name="reading_list">Lista czytanych</string>
+    <string name="wish_list">Lista życzeń</string>
+    <string name="empty_backup_error">Brak pozycji w bibliotece do utworzenia kopii zapasowej</string>
+    <string name="download_notifier_split_failed">Nie można rozdzielić pobranego obrazka</string>
+    <string name="show_larger_toolbar">Pokaż większy, rozszerzony pasek narzędzi na górze większości stron (nie pokaże się na małych urządzeniach niezależnie od ustawienia)</string>
+    <string name="pref_clear_webview_data">Wyczyść dane WebView</string>
+    <string name="webview_data_deleted">Dane WebView wyczyszczone</string>
+    <string name="complete_list">Lista zakończonych</string>
+    <string name="on_hold_list">Lista odłożonych na później</string>
+    <string name="expanded_toolbar">Rozszerzony pasek narzędzi</string>
+    <string name="split_tall_images_summary">Poprawia wydajność czytnika</string>
+    <string name="split_tall_images">Dziel długie obrazy</string>
+    <string name="unfinished_list">Lista niezakończonych</string>
+    <string name="download_notifier_split_page_not_found">Strona %d nie została znaleziona podczas podziału</string>
+    <string name="tap_to_learn_more">Kliknij, by dowiedzieć się więcej</string>
+    <string name="tap_zones">Strefy kliknięcia</string>
+    <string name="lavender">Lawenda</string>
+    <string name="view_all">Pokaż wszystko</string>
+    <string name="open_in_app">Otwórz w aplikacji</string>
+    <string name="webtoon_side_padding_5">5%</string>
+    <string name="user_agent_string">Domyślny user agent string</string>
+    <string name="loader_rar5_error">Format RARv5 jest nieobsługiwany</string>
+    <string name="battery_not_low">Poziom baterii nie jest niski</string>
+    <string name="warning_enroll_into_beta">Wersje beta mogą być niestabilne i mogą wymagać wyczyszczenia danych aplikacji.</string>
+    <string name="violet">Fiołkowy</string>
+    <string name="clear_db_exclude_read">Zachowaj mangi z przeczytanymi rozdziałami</string>
+    <string name="downloads_swipe_tutorial">Pobieranie można anulować, przesuwając je w bok
+\nPrzesuń tę wskazówkę, aby ją odrzucić</string>
+    <string name="download_ahead_info">Działa tylko na wpisach w bibliotece oraz jeśli aktualny rozdział i następny są już pobrane</string>
+    <string name="select_uninstalled_sources">Wybierz niezainstalowane źródła</string>
+    <string name="most_entries">Najwięcej wpisów</string>
+    <string name="download_ahead">Pobierz z wyprzedzeniem</string>
+    <string name="learn_why">Dowiedz się dlaczego</string>
+    <string name="zoom_double_page_spreads">Przybliż na szerszych stronach</string>
+    <string name="update_tracking_scoring_type">Aktualizuj typ punktowania %1$s</string>
+    <string name="all_read_manga">Wszystkie przeczytane mangi</string>
+    <string name="language_requires_app_restart">Niektóre języki mogą wymagać ponownego uruchomienia aplikacji aby wyświetlać się poprawnie</string>
+    <string name="warning_unenroll_from_beta">Przywrócenie poprzedniej wersji produkcyjnej może spowodować problemy i wymagać wyczyszczenia danych aplikacji.</string>
+    <string name="auto_download_while_reading">Pobieraj podczas czytania</string>
+    <string name="downloaded_chapters">Pobrane rozdziały</string>
+    <string name="read_duration">Czas odczytu</string>
+    <string name="statistics">Statystyki</string>
+    <string name="trackers">Elementy śledzące</string>
+    <string name="error_user_agent_string_invalid">Nieprawidłowy ciąg agenta użytkownika</string>
+    <string name="skipped_reason_not_always_update">Pominięto, ponieważ aktualizacja nie jest wymagana</string>
+    <string name="skip_dupe_chapters">Pomiń zduplikowane rozdziały</string>
+    <string name="allow_deleting_bookmarked_chapters">Usuwaj rozdziały dodane do zakładek</string>
+    <string name="popular">Popularne</string>
+    <string name="appwidget_updates_description">Zobacz ostatnio zaktualizowane wpisy</string>
+    <string name="appwidget_unavailable_locked">Widżet nie jest dostępny kiedy blokada aplikacji jest włączona</string>
+    <plurals name="_sources">
+        <item quantity="one">%d źródło</item>
+        <item quantity="few">%d źródła</item>
+        <item quantity="many">%d źródeł</item>
+        <item quantity="other">%d źródeł</item>
+    </plurals>
+    <string name="stat">Statystyka</string>
+    <string name="stats">Statystyki</string>
+    <string name="manga_status_distribution">Status dystrybucji</string>
+    <string name="view_detailed_statistics">Zobacz szczegółowe statystyki</string>
+    <plurals name="_statuses">
+        <item quantity="one">%d status</item>
+        <item quantity="few">%d statusy</item>
+        <item quantity="many">%d statusów</item>
+        <item quantity="other">%d statusów</item>
+    </plurals>
+    <string name="statistics_details">Szczegółowe statystyki</string>
+    <string name="tracked_titles">Śledzone tytuły</string>
+    <string name="source">Źródło</string>
+    <string name="not_rated">Nie ocenione</string>
+    <string name="length">Długość</string>
+    <plurals name="_languages">
+        <item quantity="one">%d język</item>
+        <item quantity="few">%d języki</item>
+        <item quantity="many">%d języków</item>
+        <item quantity="other">%d języków</item>
+    </plurals>
+    <string name="hide_in_library_items">Ukryj pozycje znajdujące się już w bibliotece</string>
+    <string name="read_duration_info">Czas spędzony w czytniku, na podstawie historii rozdziałów</string>
+    <string name="failed_to_update_">Nie udało się zaktualizować %1$s</string>
+    <string name="tags">Tagi</string>
+    <string name="chapters_read">Przeczytane rozdziały</string>
+    <string name="titles_in_library">Tytuły w bibliotece</string>
+    <string name="count">Liczba</string>
+    <string name="local_titles">Lokalne tytuły</string>
+    <string name="start_year">Rok rozpoczęcia</string>
+    <string name="no_data_for_filters">Nie znaleziono danych dla bieżących filtrów</string>
+    <string name="updates_last_update_info">Biblioteka ostatnio aktualizowana: %s</string>
+    <string name="show_more_chapters">Pokaż więcej rozdziałów</string>
+    <string name="gray_background">Szary</string>
+    <string name="open">Otwórz</string>
+    <string name="app_updates">Aktualizacje aplikacji</string>
+    <string name="collapse_grouped_chapters">Zwiń pogrupowane rozdziały</string>
+    <string name="by_day">Według dnia</string>
+    <string name="by_week">Według tygodnia</string>
+    <string name="by_series">Według serii</string>
+    <string name="titles_in_global_update">Tytuły globalnie</string>
+    <string name="mean_tracking_score">Średni wynik śledzenia</string>
+    <string name="manga_score_distribution">Status wyniku</string>
+    <string name="tracker">Element śledzący</string>
+    <plurals name="_series_types">
+        <item quantity="one">%d typ serii</item>
+        <item quantity="few">%d typów serii</item>
+        <item quantity="many">%d typów serii</item>
+        <item quantity="other">%d typów serii</item>
+    </plurals>
+    <string name="allow_notifications_recommended">Zezwalanie na powiadomienia jest zalecane, aby zapewnić aktualność twojej biblioteki.</string>
+    <string name="pref_remove_exclude_categories">Wykluczone kategorie</string>
+    <string name="ext_installer_pref">Instalator</string>
+    <string name="library_entries">Biblioteka</string>
+    <string name="pref_debug_info">Informacje debugowania</string>
+    <string name="label_background_activity">Aktywność w tle</string>
+    <string name="apply">Zatwierdź</string>
+    <string name="save_pages_separately">Zapisuj strony w osobnych folderach</string>
+    <string name="ext_installer_summary">Pozwól na instalacje rozszerzeń bez powiadomień oraz włącz automatyczne aktualizacje dla urządzeń poniżej Android 12</string>
+    <string name="share_cover">Udostępnij okładkę</string>
+    <string name="source_settings">Ustawienia źródła</string>
+    <string name="app_settings">Ustawienia aplikacji</string>
+    <string name="create_folders_by_manga_title">Utwórz foldery na podstawie tytułu mangi</string>
+    <string name="action_add_repo">Dodaj repozytorium</string>
+    <string name="extension_repos">Repozytoria rozszerzeń</string>
+    <plurals name="num_repos">
+        <item quantity="one">%d repozytorium</item>
+        <item quantity="few">%d repozytoriów</item>
+        <item quantity="many">%d repozytoriów</item>
+        <item quantity="other">%d repozytoriów</item>
+    </plurals>
+    <string name="repo_cannot_be_blank">Nazwa repozytorium nie może być pusta</string>
+    <string name="snack_repo_deleted">Repozytorium usunięte</string>
+    <string name="invalid_repo_name">Nieprawidłowa nazwa repozytorium</string>
+    <string name="confirm_repo_deletion">Usuń repozytorium</string>
+    <string name="delete_repo_confirmation">Czy chcesz usunąć repozytorium \"%s\"?</string>
+    <string name="extension_api_error">Nie udało się pobrać dostępnych rozszerzeń</string>
+    <string name="error_repo_exists">To repozytorium już istnieje!</string>
+    <string name="url_not_set_click_again">URL repozytorium nie ustawione, proszę zedytuj URL</string>
 </resources>

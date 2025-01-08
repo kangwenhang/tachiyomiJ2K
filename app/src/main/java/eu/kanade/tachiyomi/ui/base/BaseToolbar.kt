@@ -8,6 +8,7 @@ import androidx.core.view.isVisible
 import com.bluelinelabs.conductor.Router
 import com.google.android.material.appbar.MaterialToolbar
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.ui.main.FloatingSearchInterface
 import eu.kanade.tachiyomi.ui.main.SearchActivity
 
 open class BaseToolbar @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
@@ -15,7 +16,11 @@ open class BaseToolbar @JvmOverloads constructor(context: Context, attrs: Attrib
 
     var router: Router? = null
     val onRoot: Boolean
-        get() = router?.backstackSize ?: 1 <= 1 && context !is SearchActivity
+        get() = router?.backstackSize ?: 1 <= 1 && router?.activity !is SearchActivity
+
+    val canShowIncogOnMain: Boolean
+        get() = router?.backstack?.lastOrNull()?.controller !is FloatingSearchInterface ||
+            this !is CenteredToolbar
 
     lateinit var toolbarTitle: TextView
         protected set
@@ -29,7 +34,7 @@ open class BaseToolbar @JvmOverloads constructor(context: Context, attrs: Attrib
             attrs,
             R.styleable.Toolbar,
             0,
-            defStyleRes
+            defStyleRes,
         )
         titleTextAppearance = a.getResourceId(R.styleable.Toolbar_titleTextAppearance, 0)
         a.recycle()
@@ -65,14 +70,14 @@ open class BaseToolbar @JvmOverloads constructor(context: Context, attrs: Attrib
             getIncogRes(),
             0,
             getDropdownRes(),
-            0
+            0,
         )
     }
 
     @DrawableRes
     private fun getIncogRes(): Int {
         return when {
-            incognito -> R.drawable.ic_incognito_circle_24dp
+            incognito && canShowIncogOnMain -> R.drawable.ic_incognito_circle_24dp
             else -> 0
         }
     }
@@ -80,7 +85,7 @@ open class BaseToolbar @JvmOverloads constructor(context: Context, attrs: Attrib
     @DrawableRes
     private fun getDropdownRes(): Int {
         return when {
-            incognito && onRoot -> R.drawable.ic_blank_28dp
+            incognito && onRoot && canShowIncogOnMain -> R.drawable.ic_blank_28dp
             else -> 0
         }
     }

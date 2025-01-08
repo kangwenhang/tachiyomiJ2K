@@ -9,7 +9,7 @@ import android.webkit.WebView
 import timber.log.Timber
 
 object WebViewUtil {
-    const val MINIMUM_WEBVIEW_VERSION = 95
+    const val MINIMUM_WEBVIEW_VERSION = 114
 
     fun supportsWebView(context: Context): Boolean {
         try {
@@ -35,7 +35,6 @@ fun WebView.setDefaultSettings() {
         javaScriptEnabled = true
         domStorageEnabled = true
         databaseEnabled = true
-        setAppCacheEnabled(true)
         useWideViewPort = true
         loadWithOverviewMode = true
         cacheMode = WebSettings.LOAD_DEFAULT

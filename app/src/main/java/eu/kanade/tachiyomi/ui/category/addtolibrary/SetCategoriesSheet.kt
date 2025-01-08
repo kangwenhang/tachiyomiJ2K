@@ -18,8 +18,10 @@ import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.database.models.Category
 import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.data.database.models.MangaCategory
+import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.SetCategoriesSheetBinding
 import eu.kanade.tachiyomi.ui.category.ManageCategoryDialog
+import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.rootWindowInsetsCompat
 import eu.kanade.tachiyomi.util.view.checkHeightThen
@@ -37,7 +39,7 @@ class SetCategoriesSheet(
     var categories: MutableList<Category>,
     var preselected: Array<TriStateCheckBox.State>,
     private val addingToLibrary: Boolean,
-    val onMangaAdded: (() -> Unit) = { }
+    val onMangaAdded: (() -> Unit) = { },
 ) : E2EBottomSheetDialog<SetCategoriesSheetBinding>(activity) {
 
     constructor(
@@ -46,9 +48,11 @@ class SetCategoriesSheet(
         categories: MutableList<Category>,
         preselected: Array<Int>,
         addingToLibrary: Boolean,
-        onMangaAdded: () -> Unit
+        onMangaAdded: () -> Unit,
     ) : this(
-        activity, listOf(manga), categories,
+        activity,
+        listOf(manga),
+        categories,
         categories.map {
             if (it.id in preselected) {
                 TriStateCheckBox.State.CHECKED
@@ -56,13 +60,15 @@ class SetCategoriesSheet(
                 TriStateCheckBox.State.UNCHECKED
             }
         }.toTypedArray(),
-        addingToLibrary, onMangaAdded
+        addingToLibrary,
+        onMangaAdded,
     )
 
     private val fastAdapter: FastAdapter<AddCategoryItem>
     private val itemAdapter = ItemAdapter<AddCategoryItem>()
 
     private val db: DatabaseHelper by injectLazy()
+    private val preferences: PreferencesHelper by injectLazy()
     override var recyclerView: RecyclerView? = binding.categoryRecyclerView
 
     private val preCheckedCategories = categories.mapIndexedNotNull { index, category ->
@@ -95,7 +101,7 @@ class SetCategoriesSheet(
                 listManga.first().seriesType(context)
             } else {
                 context.getString(R.string.selection).lowercase(Locale.ROOT)
-            }
+            },
         )
 
         setOnShowListener {
@@ -111,7 +117,7 @@ class SetCategoriesSheet(
                 override fun onStateChanged(bottomSheet: View, newState: Int) {
                     updateBottomButtons()
                 }
-            }
+            },
         )
 
         binding.titleLayout.checkHeightThen {
@@ -134,7 +140,7 @@ class SetCategoriesSheet(
                     skipInversed = preselected[index] != TriStateCheckBox.State.IGNORE
                     state = preselected[index]
                 }
-            }
+            },
         )
         setCategoriesButtons()
         fastAdapter.onClickListener = onClickListener@{ view, _, item, _ ->
@@ -173,8 +179,8 @@ class SetCategoriesSheet(
 
         val items = when {
             addingToLibrary -> checkedItems.map { it.category }
-            addingMore -> checkedItems.map { it.category }.subtract(preCheckedCategories)
-            removing -> selectedCategories.subtract(selectedItems.map { it.category })
+            addingMore -> checkedItems.map { it.category }.subtract(preCheckedCategories.toSet())
+            removing -> selectedCategories.subtract(selectedItems.map { it.category }.toSet())
             nothingChanged -> selectedItems.map { it.category }
             else -> checkedItems.map { it.category }
         }
@@ -191,9 +197,9 @@ class SetCategoriesSheet(
                 else -> context.resources.getQuantityString(
                     R.plurals.category_plural,
                     items.size,
-                    items.size
+                    items.size,
                 )
-            }
+            },
         )
     }
 
@@ -204,7 +210,7 @@ class SetCategoriesSheet(
         updateBottomButtons()
         binding.root.post {
             binding.categoryRecyclerView.scrollToPosition(
-                max(0, itemAdapter.adapterItems.indexOf(selectedItems.firstOrNull()))
+                max(0, itemAdapter.adapterItems.indexOf(selectedItems.firstOrNull())),
             )
         }
     }
@@ -218,24 +224,21 @@ class SetCategoriesSheet(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val attrsArray = intArrayOf(R.attr.mainActionBarSize)
-        val array = context.obtainStyledAttributes(attrsArray)
-        val headerHeight = array.getDimensionPixelSize(0, 0)
+        val headerHeight = (activity as? MainActivity)?.toolbarHeight ?: 0
         binding.buttonLayout.updatePaddingRelative(
             bottom = activity.window.decorView.rootWindowInsetsCompat
-                ?.getInsets(systemBars())?.bottom ?: 0
+                ?.getInsets(systemBars())?.bottom ?: 0,
         )
 
         binding.buttonLayout.updateLayoutParams<ConstraintLayout.LayoutParams> {
             height = headerHeight + binding.buttonLayout.paddingBottom
         }
-        array.recycle()
 
         binding.cancelButton.setOnClickListener { dismiss() }
         binding.newCategoryButton.setOnClickListener {
             ManageCategoryDialog(null) {
                 categories = db.getCategories().executeAsBlocking()
-                val map = itemAdapter.adapterItems.map { it.category.id to it.state }.toMap()
+                val map = itemAdapter.adapterItems.associate { it.category.id to it.state }
                 itemAdapter.set(
                     categories.mapIndexed { index, category ->
                         AddCategoryItem(category).apply {
@@ -243,7 +246,7 @@ class SetCategoriesSheet(
                                 preselected.getOrElse(index) { TriStateCheckBox.State.UNCHECKED } != TriStateCheckBox.State.IGNORE
                             state = map[category.id] ?: TriStateCheckBox.State.CHECKED
                         }
-                    }
+                    },
                 )
                 setCategoriesButtons()
             }.show(activity)
@@ -269,9 +272,13 @@ class SetCategoriesSheet(
         val removeCategories = uncheckedItems.map(AddCategoryItem::category)
         val mangaCategories = listManga.map { manga ->
             val categories = db.getCategoriesForManga(manga).executeAsBlocking()
-                .subtract(removeCategories).plus(addCategories).distinct()
+                .subtract(removeCategories.toSet()).plus(addCategories).distinct()
             categories.map { MangaCategory.create(manga, it) }
         }.flatten()
+        if (addCategories.isNotEmpty() || listManga.size == 1) {
+            Category.lastCategoriesAddedTo =
+                addCategories.mapNotNull { it.id }.toSet().ifEmpty { setOf(0) }
+        }
         db.setMangaCategories(mangaCategories, listManga)
         onMangaAdded()
     }

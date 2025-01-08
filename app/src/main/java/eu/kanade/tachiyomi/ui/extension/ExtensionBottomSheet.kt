@@ -19,14 +19,19 @@ import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.ExtensionsBottomSheetBinding
 import eu.kanade.tachiyomi.databinding.RecyclerWithScrollerBinding
 import eu.kanade.tachiyomi.extension.model.Extension
+import eu.kanade.tachiyomi.extension.model.InstallStep
 import eu.kanade.tachiyomi.extension.model.InstalledExtensionsOrder
+import eu.kanade.tachiyomi.extension.util.ExtensionInstaller
 import eu.kanade.tachiyomi.ui.extension.details.ExtensionDetailsController
+import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.ui.migration.BaseMigrationInterface
 import eu.kanade.tachiyomi.ui.migration.MangaAdapter
 import eu.kanade.tachiyomi.ui.migration.MangaItem
 import eu.kanade.tachiyomi.ui.migration.SourceAdapter
 import eu.kanade.tachiyomi.ui.migration.SourceItem
 import eu.kanade.tachiyomi.ui.migration.manga.design.PreMigrationController
 import eu.kanade.tachiyomi.ui.source.BrowseController
+import eu.kanade.tachiyomi.util.system.isPackageInstalled
 import eu.kanade.tachiyomi.util.system.materialAlertDialog
 import eu.kanade.tachiyomi.util.system.rootWindowInsetsCompat
 import eu.kanade.tachiyomi.util.view.activityBinding
@@ -45,8 +50,8 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
     ExtensionAdapter.OnButtonClickListener,
     FlexibleAdapter.OnItemClickListener,
     FlexibleAdapter.OnItemLongClickListener,
-    ExtensionTrustDialog.Listener,
-    SourceAdapter.OnAllClickListener {
+    SourceAdapter.OnAllClickListener,
+    BaseMigrationInterface {
 
     var sheetBehavior: BottomSheetBehavior<*>? = null
 
@@ -61,7 +66,8 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
     val adapters
         get() = listOf(extAdapter, migAdapter)
 
-    val presenter = ExtensionBottomPresenter(this)
+    val presenter = ExtensionBottomPresenter()
+    var currentSourceTitle: String? = null
 
     private var extensions: List<ExtensionItem> = emptyList()
     var canExpand = false
@@ -84,6 +90,7 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
 
     fun onCreate(controller: BrowseController) {
         // Initialize adapter, scroll listener and recycler views
+        presenter.attachView(this)
         extAdapter = ExtensionAdapter(this)
         extAdapter?.stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
         if (migAdapter == null) {
@@ -102,50 +109,52 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
             extensionFrameLayout?.binding?.recycler?.updatePaddingRelative(bottom = bottomH)
             migrationFrameLayout?.binding?.recycler?.updatePaddingRelative(bottom = bottomH)
         }
-        binding.tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab?) {
-                isExpanding = !sheetBehavior.isExpanded()
-                if (canExpand) {
-                    this@ExtensionBottomSheet.sheetBehavior?.expand()
-                }
-                this@ExtensionBottomSheet.controller.updateTitleAndMenu()
-                when (tab?.position) {
-                    0 -> extensionFrameLayout
-                    else -> migrationFrameLayout
-                }?.binding?.recycler?.isNestedScrollingEnabled = true
-                when (tab?.position) {
-                    0 -> extensionFrameLayout
-                    else -> migrationFrameLayout
-                }?.binding?.recycler?.requestLayout()
-                sheetBehavior?.isDraggable = true
-            }
-
-            override fun onTabUnselected(tab: TabLayout.Tab?) {
-                when (tab?.position) {
-                    0 -> extensionFrameLayout
-                    else -> migrationFrameLayout
-                }?.binding?.recycler?.isNestedScrollingEnabled = false
-                if (tab?.position == 1) {
-                    presenter.deselectSource()
-                }
-            }
-
-            override fun onTabReselected(tab: TabLayout.Tab?) {
-                isExpanding = !sheetBehavior.isExpanded()
-                this@ExtensionBottomSheet.sheetBehavior?.expand()
-                when (tab?.position) {
-                    0 -> extensionFrameLayout
-                    else -> migrationFrameLayout
-                }?.binding?.recycler?.isNestedScrollingEnabled = true
-                sheetBehavior?.isDraggable = true
-                if (!isExpanding) {
+        binding.tabs.addOnTabSelectedListener(
+            object : TabLayout.OnTabSelectedListener {
+                override fun onTabSelected(tab: TabLayout.Tab?) {
+                    isExpanding = !sheetBehavior.isExpanded()
+                    if (canExpand) {
+                        this@ExtensionBottomSheet.sheetBehavior?.expand()
+                    }
+                    this@ExtensionBottomSheet.controller.updateTitleAndMenu()
                     when (tab?.position) {
                         0 -> extensionFrameLayout
                         else -> migrationFrameLayout
-                    }?.binding?.recycler?.smoothScrollToTop()
+                    }?.binding?.recycler?.isNestedScrollingEnabled = true
+                    when (tab?.position) {
+                        0 -> extensionFrameLayout
+                        else -> migrationFrameLayout
+                    }?.binding?.recycler?.requestLayout()
+                    sheetBehavior?.isDraggable = true
                 }
-            }
-        })
+
+                override fun onTabUnselected(tab: TabLayout.Tab?) {
+                    when (tab?.position) {
+                        0 -> extensionFrameLayout
+                        else -> migrationFrameLayout
+                    }?.binding?.recycler?.isNestedScrollingEnabled = false
+                    if (tab?.position == 1) {
+                        presenter.deselectSource()
+                    }
+                }
+
+                override fun onTabReselected(tab: TabLayout.Tab?) {
+                    isExpanding = !sheetBehavior.isExpanded()
+                    this@ExtensionBottomSheet.sheetBehavior?.expand()
+                    when (tab?.position) {
+                        0 -> extensionFrameLayout
+                        else -> migrationFrameLayout
+                    }?.binding?.recycler?.isNestedScrollingEnabled = true
+                    sheetBehavior?.isDraggable = true
+                    if (!isExpanding) {
+                        when (tab?.position) {
+                            0 -> extensionFrameLayout
+                            else -> migrationFrameLayout
+                        }?.binding?.recycler?.smoothScrollToTop()
+                    }
+                }
+            },
+        )
         presenter.onCreate()
         updateExtTitle()
 
@@ -179,8 +188,11 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
 
     fun updateExtTitle() {
         val extCount = presenter.getExtensionUpdateCount()
-        if (extCount > 0) binding.tabs.getTabAt(0)?.orCreateBadge
-        else binding.tabs.getTabAt(0)?.removeBadge()
+        if (extCount > 0) {
+            binding.tabs.getTabAt(0)?.orCreateBadge
+        } else {
+            binding.tabs.getTabAt(0)?.removeBadge()
+        }
     }
 
     override fun onButtonClick(position: Int) {
@@ -208,7 +220,8 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
     }
 
     override fun onUpdateAllClicked(position: Int) {
-        if (!presenter.preferences.useShizukuForExtensions() &&
+        (controller.activity as? MainActivity)?.showNotificationPermissionPrompt()
+        if (presenter.preferences.extensionInstaller().get() != ExtensionInstaller.SHIZUKU &&
             !presenter.preferences.hasPromptedBeforeUpdateAll().get()
         ) {
             controller.activity!!.materialAlertDialog()
@@ -226,8 +239,8 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
 
     override fun onExtSortClicked(view: TextView, position: Int) {
         view.popupMenu(
-            InstalledExtensionsOrder.values().map { it.value to it.nameRes },
-            presenter.preferences.installedExtensionsOrder().get()
+            InstalledExtensionsOrder.entries.map { it.value to it.nameRes },
+            presenter.preferences.installedExtensionsOrder().get(),
         ) {
             presenter.preferences.installedExtensionsOrder().set(itemId)
             extAdapter?.installedSortOrder = itemId
@@ -236,13 +249,13 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
         }
     }
 
-    fun updateAllExtensions(position: Int) {
+    private fun updateAllExtensions(position: Int) {
         val header = (extAdapter?.getSectionHeader(position)) as? ExtensionGroupItem ?: return
         val items = extAdapter?.getSectionItemPositions(header)
         val extensions = items?.mapNotNull {
             val extItem = (extAdapter?.getItem(it) as? ExtensionItem) ?: return
             val extension = (extAdapter?.getItem(it) as? ExtensionItem)?.extension ?: return
-            if (extItem.installStep == null &&
+            if ((extItem.installStep == null || extItem.installStep == InstallStep.Error) &&
                 extension is Extension.Installed && extension.hasUpdate
             ) {
                 extension
@@ -271,7 +284,7 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
                     PreMigrationController.navigateToMigration(
                         Injekt.get<PreferencesHelper>().skipPreMigration().get(),
                         controller.router,
-                        listOf(item.manga.id!!)
+                        listOf(item.manga.id!!),
                     )
                 } else if (item is SourceItem) {
                     presenter.setSelectedSource(item.source)
@@ -285,7 +298,7 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
         if (binding.tabs.selectedTabPosition == 0) {
             val extension = (extAdapter?.getItem(position) as? ExtensionItem)?.extension ?: return
             if (extension is Extension.Installed || extension is Extension.Untrusted) {
-                uninstallExtension(extension.pkgName)
+                uninstallExtension(extension.name, extension.pkgName)
             }
         }
     }
@@ -299,7 +312,7 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
         PreMigrationController.navigateToMigration(
             Injekt.get<PreferencesHelper>().skipPreMigration().get(),
             controller.router,
-            sourceMangas
+            sourceMangas,
         )
     }
 
@@ -309,8 +322,16 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
     }
 
     private fun openTrustDialog(extension: Extension.Untrusted) {
-        ExtensionTrustDialog(this, extension.signatureHash, extension.pkgName)
-            .showDialog(controller.router)
+        val activity = controller.activity ?: return
+        activity.materialAlertDialog()
+            .setTitle(R.string.untrusted_extension)
+            .setMessage(R.string.untrusted_extension_message)
+            .setPositiveButton(R.string.trust) { _, _ ->
+                trustExtension(extension.pkgName, extension.versionCode, extension.signatureHash)
+            }
+            .setNegativeButton(R.string.uninstall) { _, _ ->
+                uninstallExtension(extension.pkgName)
+            }.show()
     }
 
     fun setExtensions(extensions: List<ExtensionItem>, updateController: Boolean = true) {
@@ -321,22 +342,28 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
         drawExtensions()
     }
 
-    fun setMigrationSources(sources: List<SourceItem>) {
+    override fun setMigrationSources(sources: List<SourceItem>) {
+        currentSourceTitle = null
+        val changingAdapters = migAdapter !is SourceAdapter
         if (migAdapter !is SourceAdapter) {
             migAdapter = SourceAdapter(this)
             migrationFrameLayout?.onBind(migAdapter!!)
             migAdapter?.stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
         }
-        migAdapter?.updateDataSet(sources, true)
+        migAdapter?.updateDataSet(sources, changingAdapters)
+        controller.updateTitleAndMenu()
     }
 
-    fun setMigrationManga(manga: List<MangaItem>?) {
+    override fun setMigrationManga(title: String, manga: List<MangaItem>?) {
+        currentSourceTitle = title
+        val changingAdapters = migAdapter !is MangaAdapter
         if (migAdapter !is MangaAdapter) {
             migAdapter = MangaAdapter(this, presenter.preferences.outlineOnCovers().get())
             migrationFrameLayout?.onBind(migAdapter!!)
             migAdapter?.stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
         }
-        migAdapter?.updateDataSet(manga, true)
+        migAdapter?.updateDataSet(manga, changingAdapters)
+        controller.updateTitleAndMenu()
     }
 
     fun drawExtensions() {
@@ -344,7 +371,7 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
             extAdapter?.updateDataSet(
                 extensions.filter {
                     it.extension.name.contains(controller.extQuery, ignoreCase = true)
-                }
+                },
             )
         } else {
             extAdapter?.updateDataSet(extensions)
@@ -353,12 +380,21 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
         updateExtUpdateAllButton()
     }
 
+    fun canStillGoBack(): Boolean {
+        return (binding.tabs.selectedTabPosition == 1 && migAdapter is MangaAdapter) ||
+            (binding.tabs.selectedTabPosition == 0 && binding.sheetToolbar.hasExpandedActionView())
+    }
+
     fun canGoBack(): Boolean {
-        if (binding.tabs.selectedTabPosition == 1 && migAdapter is MangaAdapter) {
+        return if (binding.tabs.selectedTabPosition == 1 && migAdapter is MangaAdapter) {
             presenter.deselectSource()
-            return false
+            false
+        } else if (binding.sheetToolbar.hasExpandedActionView()) {
+            binding.sheetToolbar.collapseActionView()
+            false
+        } else {
+            true
         }
-        return true
     }
 
     fun downloadUpdate(item: ExtensionItem) {
@@ -373,17 +409,38 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
         val items = extAdapter?.getSectionItemPositions(updateHeader) ?: return
         updateHeader.canUpdate = items.any {
             val extItem = (extAdapter?.getItem(it) as? ExtensionItem) ?: return
-            extItem.installStep == null
+            extItem.installStep == null || extItem.installStep == InstallStep.Error
         }
         extAdapter?.updateItem(updateHeader)
     }
 
-    override fun trustSignature(signatureHash: String) {
-        presenter.trustSignature(signatureHash)
+    private fun trustExtension(pkgName: String, versionCode: Long, signatureHash: String) {
+        presenter.trustExtension(pkgName, versionCode, signatureHash)
+    }
+    private fun uninstallExtension(pkgName: String) {
+        presenter.uninstallExtension(pkgName)
     }
 
-    override fun uninstallExtension(pkgName: String) {
-        presenter.uninstallExtension(pkgName)
+    private fun uninstallExtension(extName: String, pkgName: String) {
+        if (context.isPackageInstalled(pkgName)) {
+            presenter.uninstallExtension(pkgName)
+        } else {
+            controller.activity!!.materialAlertDialog()
+                .setTitle(extName)
+                .setPositiveButton(R.string.remove) { _, _ ->
+                    presenter.uninstallExtension(pkgName)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
+    fun setCanInstallPrivately(installPrivately: Boolean) {
+        extAdapter?.installPrivately = installPrivately
+    }
+
+    fun onDestroy() {
+        presenter.onDestroy()
     }
 
     private inner class TabbedSheetAdapter : RecyclerViewPagerAdapter() {
@@ -397,7 +454,7 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
                 when (position) {
                     0 -> R.string.extensions
                     else -> R.string.migration
-                }
+                },
             )
         }
 
@@ -410,7 +467,7 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
             val binding = RecyclerWithScrollerBinding.inflate(
                 LayoutInflater.from(container.context),
                 container,
-                false
+                false,
             )
             val view: RecyclerWithScrollerView = binding.root
             val height = this@ExtensionBottomSheet.controller.activityBinding?.bottomNav?.height
@@ -450,17 +507,6 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
             val view = (obj as? RecyclerWithScrollerView) ?: return POSITION_NONE
             val index = adapters.indexOfFirst { it == view.binding?.recycler?.adapter }
             return if (index == -1) POSITION_NONE else index
-        }
-
-        /**
-         * Called when the view of this adapter is being destroyed.
-         */
-        fun onDestroy() {
-            /*for (view in boundViews) {
-                if (view is LibraryCategoryView) {
-                    view.onDestroy()
-                }
-            }*/
         }
     }
 }

@@ -36,7 +36,7 @@ class BackupNotifier(private val context: Context) {
         context.notificationManager.notify(id, build())
     }
 
-    fun showBackupProgress(): NotificationCompat.Builder {
+    fun showBackupProgress() {
         val builder = with(progressNotificationBuilder) {
             setContentTitle(context.getString(R.string.creating_backup))
 
@@ -45,8 +45,6 @@ class BackupNotifier(private val context: Context) {
         }
 
         builder.show(Notifications.ID_BACKUP_PROGRESS)
-
-        return builder
     }
 
     fun showBackupError(error: String?) {
@@ -73,7 +71,7 @@ class BackupNotifier(private val context: Context) {
             addAction(
                 R.drawable.ic_share_24dp,
                 context.getString(R.string.share),
-                NotificationReceiver.shareBackupPendingBroadcast(context, unifile.uri, Notifications.ID_BACKUP_COMPLETE)
+                NotificationReceiver.shareBackupPendingBroadcast(context, unifile.uri, Notifications.ID_BACKUP_COMPLETE),
             )
 
             show(Notifications.ID_BACKUP_COMPLETE)
@@ -88,7 +86,7 @@ class BackupNotifier(private val context: Context) {
                 setContentText(content)
             }
 
-            setProgress(maxAmount, progress, false)
+            setProgress(maxAmount, progress, progress == -1)
             setOnlyAlertOnce(true)
 
             // Clear old actions if they exist
@@ -97,11 +95,13 @@ class BackupNotifier(private val context: Context) {
             addAction(
                 R.drawable.ic_close_24dp,
                 context.getString(R.string.stop),
-                NotificationReceiver.cancelRestorePendingBroadcast(context, Notifications.ID_RESTORE_PROGRESS)
+                NotificationReceiver.cancelRestorePendingBroadcast(context, Notifications.ID_RESTORE_PROGRESS),
             )
         }
 
-        builder.show(Notifications.ID_RESTORE_PROGRESS)
+        if (progress != -1) {
+            builder.show(Notifications.ID_RESTORE_PROGRESS)
+        }
 
         return builder
     }
@@ -124,8 +124,8 @@ class BackupNotifier(private val context: Context) {
             R.string.restore_duration,
             TimeUnit.MILLISECONDS.toMinutes(time),
             TimeUnit.MILLISECONDS.toSeconds(time) - TimeUnit.MINUTES.toSeconds(
-                TimeUnit.MILLISECONDS.toMinutes(time)
-            )
+                TimeUnit.MILLISECONDS.toMinutes(time),
+            ),
         )
 
         with(completeNotificationBuilder) {
@@ -142,7 +142,7 @@ class BackupNotifier(private val context: Context) {
                 addAction(
                     R.drawable.ic_eye_24dp,
                     context.getString(R.string.open_log),
-                    NotificationReceiver.openErrorLogPendingActivity(context, uri)
+                    NotificationReceiver.openErrorOrSkippedLogPendingActivity(context, uri),
                 )
             }
 

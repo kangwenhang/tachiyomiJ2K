@@ -11,7 +11,11 @@ import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.util.storage.DiskUtil
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import uy.kohesive.injekt.injectLazy
 
@@ -28,6 +32,8 @@ class DownloadProvider(private val context: Context) {
      */
     private val preferences: PreferencesHelper by injectLazy()
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     /**
      * The root directory for downloads.
      */
@@ -40,7 +46,7 @@ class DownloadProvider(private val context: Context) {
     init {
         preferences.downloadsDirectory().asFlow().drop(1).onEach {
             downloadsDir = UniFile.fromUri(context, it.toUri())
-        }
+        }.launchIn(scope)
     }
 
     /**
@@ -101,22 +107,10 @@ class DownloadProvider(private val context: Context) {
      */
     fun findChapterDirs(chapters: List<Chapter>, manga: Manga, source: Source): List<UniFile> {
         val mangaDir = findMangaDir(manga, source) ?: return emptyList()
-        val chapterNameHashSet = chapters.map { it.name }.toHashSet()
-        val scanalatorNameHashSet = chapters.map { getChapterDirName(it) }.toHashSet()
-        val scanalatorCbzNameHashSet = chapters.map { "${getChapterDirName(it)}.cbz" }.toHashSet()
-
-        return mangaDir.listFiles()!!.asList().filter { file ->
-            file.name?.let { fileName ->
-                if (scanalatorNameHashSet.contains(fileName)) {
-                    return@filter true
-                }
-                if (scanalatorCbzNameHashSet.contains(fileName)) {
-                    return@filter true
-                }
-                val afterScanlatorCheck = fileName.substringAfter("_")
-                return@filter chapterNameHashSet.contains(fileName) || chapterNameHashSet.contains(afterScanlatorCheck)
-            }
-            return@filter false
+        return chapters.mapNotNull { chapter ->
+            getValidChapterDirNames(chapter).map { listOf(it, "$it.cbz") }.flatten().asSequence()
+                .mapNotNull { mangaDir.findFile(it) }
+                .firstOrNull()
         }
     }
 
@@ -130,7 +124,7 @@ class DownloadProvider(private val context: Context) {
     fun renameChapters() {
         val db by injectLazy<DatabaseHelper>()
         val sourceManager by injectLazy<SourceManager>()
-        val mangas = db.getLibraryMangas().executeAsBlocking()
+        val mangas = db.getFavoriteMangas().executeAsBlocking()
         mangas.forEach sfor@{ manga ->
             val sourceId = manga.source
             val source = sourceManager.get(sourceId) ?: return@sfor
@@ -164,7 +158,7 @@ class DownloadProvider(private val context: Context) {
     fun findUnmatchedChapterDirs(
         chapters: List<Chapter>,
         manga: Manga,
-        source: Source
+        source: Source,
     ): List<UniFile> {
         val mangaDir = findMangaDir(manga, source) ?: return emptyList()
         val chapterNameHashSet = chapters.map { it.name }.toHashSet()
@@ -228,10 +222,13 @@ class DownloadProvider(private val context: Context) {
      *
      * @param chapter the chapter to query.
      */
-    fun getChapterDirName(chapter: Chapter): String {
+    fun getChapterDirName(chapter: Chapter, includeBlank: Boolean = false): String {
         return DiskUtil.buildValidFilename(
-            if (chapter.scanlator != null) "${chapter.scanlator}_${chapter.name}"
-            else chapter.name
+            if (!chapter.scanlator.isNullOrBlank()) {
+                "${chapter.scanlator}_${chapter.name}"
+            } else {
+                (if (includeBlank) "_" else "") + chapter.name
+            },
         )
     }
 
@@ -243,8 +240,9 @@ class DownloadProvider(private val context: Context) {
     fun getValidChapterDirNames(chapter: Chapter): List<String> {
         return listOf(
             getChapterDirName(chapter),
+            getChapterDirName(chapter, true),
             // Legacy chapter directory name used in v0.8.4 and before
-            DiskUtil.buildValidFilename(chapter.name)
-        )
+            DiskUtil.buildValidFilename(chapter.name),
+        ).distinct()
     }
 }

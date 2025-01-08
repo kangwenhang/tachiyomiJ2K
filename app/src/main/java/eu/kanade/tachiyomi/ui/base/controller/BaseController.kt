@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.base.controller
 
 import android.app.Activity
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
@@ -9,11 +10,19 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.forEach
+import androidx.core.view.isVisible
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import com.bluelinelabs.conductor.Controller
 import com.bluelinelabs.conductor.ControllerChangeHandler
 import com.bluelinelabs.conductor.ControllerChangeType
+import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.util.system.getResourceColor
+import eu.kanade.tachiyomi.util.view.BackHandlerControllerInterface
 import eu.kanade.tachiyomi.util.view.activityBinding
+import eu.kanade.tachiyomi.util.view.backgroundColor
+import eu.kanade.tachiyomi.util.view.isControllerVisible
 import eu.kanade.tachiyomi.util.view.removeQueryListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
@@ -21,7 +30,7 @@ import kotlinx.coroutines.cancel
 import timber.log.Timber
 
 abstract class BaseController<VB : ViewBinding>(bundle: Bundle? = null) :
-    Controller(bundle) {
+    Controller(bundle), BackHandlerControllerInterface {
 
     lateinit var binding: VB
     lateinit var viewScope: CoroutineScope
@@ -52,12 +61,13 @@ abstract class BaseController<VB : ViewBinding>(bundle: Bundle? = null) :
                     viewScope.cancel()
                     Timber.d("Destroy view for ${controller.instance()}")
                 }
-            }
+            },
         )
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup, savedViewState: Bundle?): View {
         binding = createBinding(inflater)
+        binding.root.backgroundColor = binding.root.context.getResourceColor(R.attr.background)
         return binding.root
     }
 
@@ -66,25 +76,37 @@ abstract class BaseController<VB : ViewBinding>(bundle: Bundle? = null) :
     open fun onViewCreated(view: View) { }
 
     override fun onChangeStarted(handler: ControllerChangeHandler, type: ControllerChangeType) {
-        if (type.isEnter) {
+        if (type.isEnter && isControllerVisible) {
             setTitle()
+        } else if (type.isEnter) {
+            view?.alpha = 0f
         } else {
             removeQueryListener()
         }
-        setHasOptionsMenu(type.isEnter)
+        setHasOptionsMenu(type.isEnter && isControllerVisible)
         super.onChangeStarted(handler, type)
     }
-
-    val onRoot: Boolean
-        get() = router.backstack.lastOrNull()?.controller == this
 
     open fun getTitle(): String? {
         return null
     }
 
+    open fun getSearchTitle(): String? {
+        return null
+    }
+
+    open fun getBigIcon(): Drawable? {
+        return null
+    }
+
+    open fun canStillGoBack(): Boolean { return false }
+
+    open val mainRecycler: RecyclerView?
+        get() = null
+
     override fun onActivityPaused(activity: Activity) {
         super.onActivityPaused(activity)
-        removeQueryListener()
+        removeQueryListener(false)
     }
 
     fun setTitle() {
@@ -96,8 +118,16 @@ abstract class BaseController<VB : ViewBinding>(bundle: Bundle? = null) :
             parentController = parentController.parentController
         }
 
-        if (router.backstack.lastOrNull()?.controller == this) {
-            (activity as? AppCompatActivity)?.supportActionBar?.title = getTitle()
+        if (isControllerVisible) {
+            (activity as? AppCompatActivity)?.title = getTitle()
+            (activity as? MainActivity)?.searchTitle = getSearchTitle()
+            val icon = getBigIcon()
+            activityBinding?.bigIconLayout?.isVisible = icon != null
+            if (icon != null) {
+                activityBinding?.bigIcon?.setImageDrawable(getBigIcon())
+            } else {
+                activityBinding?.bigIcon?.setImageDrawable(getBigIcon())
+            }
         }
     }
 
@@ -115,7 +145,7 @@ abstract class BaseController<VB : ViewBinding>(bundle: Bundle? = null) :
         setOnActionExpandListener(
             object : MenuItem.OnActionExpandListener {
                 override fun onMenuItemActionExpand(item: MenuItem): Boolean {
-                    hideItemsIfExpanded(item, activityBinding?.cardToolbar?.menu, true)
+                    hideItemsIfExpanded(item, activityBinding?.searchToolbar?.menu, true)
                     return onExpand?.invoke(item) ?: true
                 }
 
@@ -124,7 +154,7 @@ abstract class BaseController<VB : ViewBinding>(bundle: Bundle? = null) :
 
                     return onCollapse?.invoke(item) ?: true
                 }
-            }
+            },
         )
 
         if (expandActionViewFromInteraction) {
@@ -132,6 +162,10 @@ abstract class BaseController<VB : ViewBinding>(bundle: Bundle? = null) :
             expandActionView()
         }
     }
+
+    open fun onActionViewExpand(item: MenuItem?) { }
+    open fun onActionViewCollapse(item: MenuItem?) { }
+    open fun onSearchActionViewLongClickQuery(): String? = null
 
     fun hideItemsIfExpanded(searchItem: MenuItem?, menu: Menu?, isExpanded: Boolean = false) {
         menu ?: return

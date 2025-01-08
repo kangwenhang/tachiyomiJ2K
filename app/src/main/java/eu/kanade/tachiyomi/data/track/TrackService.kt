@@ -5,7 +5,6 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.database.models.Track
-import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.data.track.model.TrackSearch
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.util.system.executeOnIO
@@ -14,7 +13,7 @@ import uy.kohesive.injekt.injectLazy
 
 abstract class TrackService(val id: Int) {
 
-    val preferences: PreferencesHelper by injectLazy()
+    val trackPreferences: TrackPreferences by injectLazy()
     val networkService: NetworkHelper by injectLazy()
     val db: DatabaseHelper by injectLazy()
     open fun canRemoveFromService() = false
@@ -31,6 +30,8 @@ abstract class TrackService(val id: Int) {
     @DrawableRes
     abstract fun getLogo(): Int
 
+    abstract fun getTrackerColor(): Int
+
     abstract fun getLogoColor(): Int
 
     abstract fun getStatusList(): List<Int>
@@ -38,6 +39,8 @@ abstract class TrackService(val id: Int) {
     abstract fun isCompletedStatus(index: Int): Boolean
 
     abstract fun completedStatus(): Int
+    abstract fun readingStatus(): Int
+    abstract fun planningStatus(): Int
 
     abstract fun getStatus(status: Int): String
 
@@ -49,11 +52,15 @@ abstract class TrackService(val id: Int) {
         return index.toFloat()
     }
 
+    open fun get10PointScore(score: Float): Float {
+        return score
+    }
+
     abstract fun displayScore(track: Track): String
 
     abstract suspend fun add(track: Track): Track
 
-    abstract suspend fun update(track: Track, setToReadStatus: Boolean = false): Track
+    abstract suspend fun update(track: Track, setToRead: Boolean = false): Track
 
     abstract suspend fun bind(track: Track): Track
 
@@ -65,25 +72,43 @@ abstract class TrackService(val id: Int) {
 
     open suspend fun removeFromService(track: Track): Boolean = false
 
+    open fun updateTrackStatus(
+        track: Track,
+        setToReadStatus: Boolean,
+        setToComplete: Boolean = false,
+        mustReadToComplete: Boolean = false,
+    ) {
+        if (setToReadStatus && track.status == planningStatus() && track.last_chapter_read != 0f) {
+            track.status = readingStatus()
+        }
+        if (setToComplete &&
+            (!mustReadToComplete || track.status == readingStatus()) &&
+            track.total_chapters != 0 &&
+            track.last_chapter_read.toInt() == track.total_chapters
+        ) {
+            track.status = completedStatus()
+        }
+    }
+
     @CallSuper
     open fun logout() {
-        preferences.setTrackCredentials(this, "", "")
+        trackPreferences.setCredentials(this, "", "")
     }
 
     open val isLogged: Boolean
         get() = getUsername().isNotEmpty() &&
             getPassword().isNotEmpty()
 
-    fun getUsername() = preferences.trackUsername(this)!!
+    fun getUsername() = trackPreferences.trackUsername(this).get()
 
-    fun getPassword() = preferences.trackPassword(this)!!
+    fun getPassword() = trackPreferences.trackPassword(this).get()
 
     fun saveCredentials(username: String, password: String) {
-        preferences.setTrackCredentials(this, username, password)
+        trackPreferences.setCredentials(this, username, password)
     }
 }
 
-suspend fun TrackService.updateNewTrackInfo(track: Track, planningStatus: Int) {
+suspend fun TrackService.updateNewTrackInfo(track: Track) {
     val manga = db.getManga(track.manga_id).executeOnIO()
     val allRead = manga?.isOneShotOrCompleted(db) == true &&
         db.getChapters(track.manga_id).executeOnIO().all { it.read }
@@ -92,10 +117,10 @@ suspend fun TrackService.updateNewTrackInfo(track: Track, planningStatus: Int) {
         track.finished_reading_date = getCompletedDate(track, allRead)
     }
     track.last_chapter_read = getLastChapterRead(track).takeUnless {
-        it == 0 && allRead
-    } ?: 1
-    if (track.last_chapter_read == 0) {
-        track.status = planningStatus
+        it == 0f && allRead
+    } ?: 1f
+    if (track.last_chapter_read == 0f) {
+        track.status = planningStatus()
     }
     if (allRead) {
         track.status = completedStatus()
@@ -120,8 +145,8 @@ suspend fun TrackService.getCompletedDate(track: Track, allRead: Boolean): Long 
     return 0L
 }
 
-suspend fun TrackService.getLastChapterRead(track: Track): Int {
+suspend fun TrackService.getLastChapterRead(track: Track): Float {
     val chapters = db.getChapters(track.manga_id).executeOnIO()
     val lastChapterRead = chapters.filter { it.read }.minByOrNull { it.source_order }
-    return lastChapterRead?.takeIf { it.isRecognizedNumber }?.chapter_number?.toInt() ?: 0
+    return lastChapterRead?.takeIf { it.isRecognizedNumber }?.chapter_number ?: 0f
 }

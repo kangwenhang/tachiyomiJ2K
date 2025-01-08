@@ -6,8 +6,8 @@ import android.content.DialogInterface
 import android.os.Bundle
 import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
+import com.fredporciuncula.flow.preferences.Preference
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.tfcporciuncula.flow.Preference
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.database.models.Category
@@ -103,19 +103,20 @@ class ManageCategoryDialog(bundle: Bundle? = null) :
         }
         when (
             updatePref(
-                preferences.downloadNewCategories(),
-                preferences.downloadNewCategoriesExclude(),
-                binding.downloadNew
+                preferences.downloadNewChaptersInCategories(),
+                preferences.excludeCategoriesInDownloadNew(),
+                binding.downloadNew,
             )
         ) {
-            true -> preferences.downloadNew().set(true)
-            false -> preferences.downloadNew().set(false)
+            true -> preferences.downloadNewChapters().set(true)
+            false -> preferences.downloadNewChapters().set(false)
+            else -> {}
         }
         if (preferences.libraryUpdateInterval().get() > 0 &&
             updatePref(
                     preferences.libraryUpdateCategories(),
                     preferences.libraryUpdateCategoriesExclude(),
-                    binding.includeGlobal
+                    binding.includeGlobal,
                 ) == false
         ) {
             preferences.libraryUpdateInterval().set(0)
@@ -149,14 +150,14 @@ class ManageCategoryDialog(bundle: Bundle? = null) :
         binding.title.hint =
             category?.name ?: binding.editCategories.context.getString(R.string.category)
         binding.title.append(category?.name ?: "")
-        val downloadNew = preferences.downloadNew().get()
+        val downloadNew = preferences.downloadNewChapters().get()
         setCheckbox(
             binding.downloadNew,
-            preferences.downloadNewCategories(),
-            preferences.downloadNewCategoriesExclude(),
-            true
+            preferences.downloadNewChaptersInCategories(),
+            preferences.excludeCategoriesInDownloadNew(),
+            true,
         )
-        if (downloadNew && preferences.downloadNewCategories().get().isEmpty()) {
+        if (downloadNew && preferences.downloadNewChaptersInCategories().get().isEmpty()) {
             binding.downloadNew.isVisible = false
         } else if (!downloadNew) {
             binding.downloadNew.isVisible = true
@@ -168,7 +169,7 @@ class ManageCategoryDialog(bundle: Bundle? = null) :
             binding.includeGlobal,
             preferences.libraryUpdateCategories(),
             preferences.libraryUpdateCategoriesExclude(),
-            preferences.libraryUpdateInterval().get() > 0
+            preferences.libraryUpdateInterval().get() > 0,
         )
     }
 
@@ -176,7 +177,7 @@ class ManageCategoryDialog(bundle: Bundle? = null) :
     private fun updatePref(
         categories: Preference<Set<String>>,
         excludeCategories: Preference<Set<String>>,
-        box: TriStateCheckBox
+        box: TriStateCheckBox,
     ): Boolean? {
         val categoryId = category?.id ?: return null
         if (!box.isVisible) return null
@@ -205,15 +206,17 @@ class ManageCategoryDialog(bundle: Bundle? = null) :
         box: TriStateCheckBox,
         categories: Preference<Set<String>>,
         excludeCategories: Preference<Set<String>>,
-        shouldShow: Boolean
+        shouldShow: Boolean,
     ) {
         val updateCategories = categories.get()
         val excludeUpdateCategories = excludeCategories.get()
         box.isVisible = (updateCategories.isNotEmpty() || excludeUpdateCategories.isNotEmpty()) && shouldShow
-        if (shouldShow) box.state = when {
-            updateCategories.any { category?.id == it.toIntOrNull() } -> TriStateCheckBox.State.CHECKED
-            excludeUpdateCategories.any { category?.id == it.toIntOrNull() } -> TriStateCheckBox.State.IGNORE
-            else -> TriStateCheckBox.State.UNCHECKED
+        if (shouldShow) {
+            box.state = when {
+                updateCategories.any { category?.id == it.toIntOrNull() } -> TriStateCheckBox.State.CHECKED
+                excludeUpdateCategories.any { category?.id == it.toIntOrNull() } -> TriStateCheckBox.State.IGNORE
+                else -> TriStateCheckBox.State.UNCHECKED
+            }
         }
     }
 }

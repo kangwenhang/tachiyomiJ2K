@@ -6,6 +6,7 @@ import android.content.Context
 import android.util.AttributeSet
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.AppCompatCheckedTextView
+import androidx.core.content.edit
 import androidx.core.view.children
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import eu.kanade.tachiyomi.util.system.disableItems
@@ -14,7 +15,7 @@ class MultiListMatPreference @JvmOverloads constructor(
     activity: Activity?,
     context: Context,
     attrs: AttributeSet? =
-        null
+        null,
 ) :
     ListMatPreference(activity, context, attrs) {
 
@@ -43,7 +44,7 @@ class MultiListMatPreference @JvmOverloads constructor(
     }
 
     override var customSummaryProvider: SummaryProvider<MatPreference>? = SummaryProvider<MatPreference> {
-        var values = prefs.getStringSet(key, defValue).get().mapNotNull { value ->
+        var values = (sharedPreferences?.getStringSet(key, defValue) ?: defValue).mapNotNull { value ->
             entryValues.indexOf(value).takeUnless { it == -1 }
         }.toIntArray().sorted().map { entries[it] }
         allSelectionRes?.let { allRes ->
@@ -63,11 +64,17 @@ class MultiListMatPreference @JvmOverloads constructor(
 
     @SuppressLint("CheckResult")
     override fun MaterialAlertDialogBuilder.setListItems() {
-        val set = prefs.getStringSet(key, defValue).get()
+        val set = preferenceDataStore?.getStringSet(key, defValue)
+            ?: sharedPreferences?.getStringSet(key, defValue) ?: defValue
         val items = if (allSelectionRes != null) {
-            if (showAllLast) entries + listOf(context.getString(allSelectionRes!!))
-            else listOf(context.getString(allSelectionRes!!)) + entries
-        } else entries
+            if (showAllLast) {
+                entries + listOf(context.getString(allSelectionRes!!))
+            } else {
+                listOf(context.getString(allSelectionRes!!)) + entries
+            }
+        } else {
+            entries
+        }
         val allPos = if (showAllLast) items.size - 1 else 0
 
         val allValue = booleanArrayOf(set.isEmpty() || allIsAlwaysSelected)
@@ -82,9 +89,16 @@ class MultiListMatPreference @JvmOverloads constructor(
             var value = pos.mapNotNull {
                 entryValues.getOrNull(it - if (allSelectionRes != null && !showAllLast) 1 else 0)
             }.toSet()
-            if (allSelectionRes != null && !allIsAlwaysSelected && selected[allPos]) value = emptySet()
-            prefs.getStringSet(key, emptySet()).set(value)
-            callChangeListener(value)
+            if (allSelectionRes != null && !allIsAlwaysSelected && selected[allPos]) {
+                value = emptySet()
+            }
+            if (callChangeListener(value) && isPersistent) {
+                if (preferenceDataStore != null) {
+                    preferenceDataStore?.putStringSet(key, value)
+                } else if (preferenceDataStore == null) {
+                    sharedPreferences?.edit { putStringSet(key, value) }
+                }
+            }
             notifyChanged()
         }
         setMultiChoiceItems(items.toTypedArray(), selected) { dialog, pos, checked ->
@@ -105,8 +119,9 @@ class MultiListMatPreference @JvmOverloads constructor(
             }
             selected[pos] = checked
             if (allSelectionRes != null && !allIsAlwaysSelected) {
-                if (checked) selected[allPos] = false
-                else if (selected.none { it }) selected[allPos] = true
+                if (checked) {
+                    selected[allPos] = false
+                } else if (selected.none { it }) selected[allPos] = true
                 (dialog as? AlertDialog)?.listView?.setItemChecked(pos, selected[allPos])
             }
         }

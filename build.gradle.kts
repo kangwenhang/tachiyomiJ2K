@@ -1,7 +1,7 @@
 plugins {
     id(Plugins.kotlinter.name) version Plugins.kotlinter.version
     id(Plugins.gradleVersions.name) version Plugins.gradleVersions.version
-    id(Plugins.jetbrainsKotlin) version Versions.kotlin apply false
+    id(Plugins.jetbrainsKotlin) version AndroidVersions.kotlin apply false
 }
 allprojects {
     repositories {
@@ -25,12 +25,12 @@ subprojects {
 
 buildscript {
     dependencies {
-        classpath(LegacyPluginClassPath.fireBaseCrashlytics)
-        classpath("com.android.tools.build:gradle:7.1.3")
-        classpath(LegacyPluginClassPath.googleServices)
-        classpath(LegacyPluginClassPath.kotlinPlugin)
-        classpath("com.google.android.gms:oss-licenses-plugin:0.10.4")
-        classpath(LegacyPluginClassPath.kotlinSerializations)
+        classpath("com.android.tools.build:gradle:8.1.2")
+        classpath("com.google.gms:google-services:4.3.15")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${AndroidVersions.kotlin}")
+        classpath("com.google.android.gms:oss-licenses-plugin:0.10.6")
+        classpath("org.jetbrains.kotlin:kotlin-serialization:${AndroidVersions.kotlin}")
+        classpath("com.google.firebase:firebase-crashlytics-gradle:2.9.4")
     }
     repositories {
         gradlePluginPortal()

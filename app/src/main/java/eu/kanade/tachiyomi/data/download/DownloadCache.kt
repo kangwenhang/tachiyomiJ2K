@@ -35,7 +35,7 @@ class DownloadCache(
     private val context: Context,
     private val provider: DownloadProvider,
     private val sourceManager: SourceManager,
-    private val preferences: PreferencesHelper = Injekt.get()
+    private val preferences: PreferencesHelper = Injekt.get(),
 ) {
 
     /**
@@ -84,8 +84,8 @@ class DownloadCache(
         checkRenew()
 
         val files = mangaFiles[manga.id]?.toHashSet() ?: return false
-        return provider.getValidChapterDirNames(chapter).any {
-            it in files || "$it.cbz" in files
+        return provider.getValidChapterDirNames(chapter).any { chapName ->
+            files.any { chapName.equals(it, true) || "$chapName.cbz".equals(it, true) }
         }
     }
 
@@ -153,7 +153,7 @@ class DownloadCache(
 
             val mangaDirs = sourceDir.dir.listFiles().orEmpty().mapNotNull { mangaDir ->
                 val name = mangaDir.name ?: return@mapNotNull null
-                val chapterDirs = mangaDir.listFiles().orEmpty().mapNotNull { chapterFile -> chapterFile.name?.replace(".cbz", "") }.toHashSet()
+                val chapterDirs = mangaDir.listFiles().orEmpty().mapNotNull { chapterFile -> chapterFile.name?.substringBeforeLast(".cbz") }.toHashSet()
                 name to MangaDirectory(mangaDir, chapterDirs)
             }.toMap()
 
@@ -205,9 +205,9 @@ class DownloadCache(
         val id = manga.id ?: return
         for (chapter in chapters) {
             val list = provider.getValidChapterDirNames(chapter)
-            list.forEach {
-                if (mangaFiles[id] != null && it in mangaFiles[id]!!) {
-                    mangaFiles[id]?.remove(it)
+            list.forEach { fileName ->
+                mangaFiles[id]?.firstOrNull { fileName.equals(it, true) }?.let { chapterFile ->
+                    mangaFiles[id]?.remove(chapterFile)
                 }
             }
         }
@@ -250,7 +250,7 @@ class DownloadCache(
      */
     private class RootDirectory(
         val dir: UniFile,
-        var files: Map<Long, SourceDirectory> = hashMapOf()
+        var files: Map<Long, SourceDirectory> = hashMapOf(),
     )
 
     /**
@@ -258,7 +258,7 @@ class DownloadCache(
      */
     private class SourceDirectory(
         val dir: UniFile,
-        var files: Map<Long, MutableSet<String>> = hashMapOf()
+        var files: Map<Long, MutableSet<String>> = hashMapOf(),
     )
 
     /**
@@ -266,7 +266,7 @@ class DownloadCache(
      */
     private class MangaDirectory(
         val dir: UniFile,
-        var files: MutableSet<String> = hashSetOf()
+        var files: MutableSet<String> = hashSetOf(),
     )
 
     /**

@@ -3,10 +3,7 @@ package eu.kanade.tachiyomi.ui.migration
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuInflater
-import android.view.MenuItem
-import androidx.appcompat.widget.SearchView
 import androidx.core.os.bundleOf
-import com.jakewharton.rxbinding.support.v7.widget.queryTextChangeEvents
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.database.models.Manga
@@ -16,20 +13,21 @@ import eu.kanade.tachiyomi.ui.main.BottomNavBarInterface
 import eu.kanade.tachiyomi.ui.migration.manga.process.MigrationListController
 import eu.kanade.tachiyomi.ui.source.globalsearch.GlobalSearchCardAdapter
 import eu.kanade.tachiyomi.ui.source.globalsearch.GlobalSearchController
-import eu.kanade.tachiyomi.ui.source.globalsearch.GlobalSearchPresenter
+import eu.kanade.tachiyomi.util.view.activityBinding
+import eu.kanade.tachiyomi.util.view.setOnQueryTextChangeListener
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 
 class SearchController(
     private var manga: Manga? = null,
-    private var sources: List<CatalogueSource>? = null
+    private var sources: List<CatalogueSource>? = null,
 ) : GlobalSearchController(
     manga?.originalTitle,
     bundle = bundleOf(
         OLD_MANGA to manga?.id,
-        SOURCES to sources?.map { it.id }?.toLongArray()
-    )
+        SOURCES to sources?.map { it.id }?.toLongArray(),
+    ),
 ),
     BottomNavBarInterface {
 
@@ -43,18 +41,16 @@ class SearchController(
     constructor(mangaId: Long, sources: LongArray) :
         this(
             Injekt.get<DatabaseHelper>().getManga(mangaId).executeAsBlocking(),
-            sources.map { Injekt.get<SourceManager>().getOrStub(it) }.filterIsInstance<CatalogueSource>()
+            sources.map { Injekt.get<SourceManager>().getOrStub(it) }.filterIsInstance<CatalogueSource>(),
         )
 
     @Suppress("unused")
     constructor(bundle: Bundle) : this(
         bundle.getLong(OLD_MANGA),
-        bundle.getLongArray(SOURCES) ?: LongArray(0)
+        bundle.getLongArray(SOURCES) ?: LongArray(0),
     )
 
-    override fun createPresenter(): GlobalSearchPresenter {
-        return SearchPresenter(initialQuery, manga!!, sources = sources)
-    }
+    override val presenter = SearchPresenter(initialQuery, manga!!, sources = sources)
 
     override fun onMangaClick(manga: Manga) {
         if (targetController is MigrationListController) {
@@ -83,31 +79,11 @@ class SearchController(
         // Inflate menu.
         inflater.inflate(R.menu.catalogue_new_list, menu)
 
-        // Initialize search menu
-        val searchItem = menu.findItem(R.id.action_search)
-        val searchView = searchItem.actionView as SearchView
-
-        searchItem.setOnActionExpandListener(
-            object : MenuItem.OnActionExpandListener {
-                override fun onMenuItemActionExpand(item: MenuItem?): Boolean {
-                    searchView.onActionViewExpanded() // Required to show the query in the view
-                    searchView.setQuery(presenter.query, false)
-                    return true
-                }
-
-                override fun onMenuItemActionCollapse(item: MenuItem?): Boolean {
-                    return true
-                }
-            }
-        )
-
-        searchView.queryTextChangeEvents()
-            .filter { it.isSubmitted }
-            .subscribeUntilDestroy {
-                presenter.search(it.queryText().toString())
-                searchItem.collapseActionView()
-                setTitle() // Update toolbar title
-            }
+        setOnQueryTextChangeListener(activityBinding?.searchToolbar?.searchView, onlyOnSubmit = true, hideKbOnSubmit = true) {
+            presenter.search(it ?: "")
+            setTitle() // Update toolbar title
+            true
+        }
     }
 
     override fun canChangeTabs(block: () -> Unit): Boolean {

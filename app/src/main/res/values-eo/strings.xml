@@ -20,8 +20,8 @@
     <string name="unread">Nelegita</string>
     <string name="new_chapters">Novaj ĉapitroj</string>
     <plurals name="chapters_plural">
-        <item quantity="one">Ĉapitroj</item>
-        <item quantity="other"/>
+        <item quantity="one">1 ĉapitro</item>
+        <item quantity="other">%1$s ĉapitroj</item>
     </plurals>
     <string name="description">Priskribo</string>
     <string name="artist">Desegnisto</string>
@@ -67,7 +67,6 @@
     <string name="version_">Versio: %1$s</string>
     <string name="language_">Lingvo: %1$s</string>
     <string name="nsfw_short">18+</string>
-    <string name="unofficial">Neoficiala</string>
     <string name="next_chapter">Sekvanta ĉapitro</string>
     <string name="previous_chapter">Antaŭa ĉapitro</string>
     <string name="volume_keys">Laŭtecaj klavoj</string>
@@ -187,7 +186,6 @@
     <string name="cancel_all_for_series">Nuligi ĉiujn por ĉi tiu serio</string>
     <string name="restoring_backup_canceled">Rezignita restaŭro</string>
     <string name="services">Servoj</string>
-    <string name="unofficial_extension_message">Ĉi tiu kromaĵo ne estas de la oficiala Tachiyomi kromaĵlisto.</string>
     <plurals name="missing_chapters_warning">
         <item quantity="one">Mankas 1 ĉapitron</item>
         <item quantity="other">Mankas %d ĉapitrojn</item>
@@ -228,14 +226,12 @@
     <string name="alpha_initial">Vid\'</string>
     <string name="source_not_installed_">Fonto ne instalita: %1$s</string>
     <string name="rereading">Legataj denove</string>
-    <string name="only_update_ongoing">Nur ĝisdatigi okazantaj mangaojn</string>
     <string name="free">Libera</string>
     <string name="restore">Restaŭro</string>
     <string name="move_to_bottom">Movi al malsupro</string>
     <string name="other">Aliaj</string>
     <string name="label_global_search">Serĉi ĉie</string>
     <string name="pending">Atendantaj</string>
-    <string name="nav_layout">Navigaranĝo</string>
     <string name="added_to_library">Aldonita al biblioteko</string>
     <string name="refresh_tracking">Aktualigi ŝanĝspuradon</string>
     <string name="network">Reto</string>
@@ -265,10 +261,6 @@
     <string name="global_search">Ĉiea serĉo…</string>
     <string name="last_used">Laste uzitaj</string>
     <string name="date_fetched">Dato venigita</string>
-    <plurals name="notification_update_failed">
-        <item quantity="one">1 ĝisdatigo malsukcesis%1$d ĝisdatigoj malsukcesis</item>
-        <item quantity="other"></item>
-    </plurals>
     <string name="may_contain_nsfw">Enhaveblas NSFW (18+) enhavon</string>
     <string name="use_image_as_cover">Ĉu uzi ĉi-bildon kiel kovrilo\?</string>
     <string name="current_chapter">Aktuala:</string>
@@ -287,9 +279,7 @@
     <string name="skip_read_chapters">Preterpasi ĉapitrojn markitajn kiel legitaj</string>
     <string name="skip_filtered_chapters">Preterpasi filtritajn ĉapitroj</string>
     <string name="invert_volume_keys">Inversigi laŭtec-butonojn</string>
-    <string name="tapping">Tuŝetado</string>
     <string name="actions">Agoj</string>
-    <string name="create_folders_by_manga_title">Kreas dosierujojn laŭ mangaaj titoloj</string>
     <string name="removed_from_library">Forigita de biblioteko</string>
     <string name="failed_to_update_cover">Aktualigo de kovrilo fiaskis</string>
     <string name="set_as_default">Agordi kiel defaŭlta</string>
@@ -307,7 +297,6 @@
     <string name="tako">Tako</string>
     <string name="updated_to_">Ĝisdatigita al v%1$s</string>
     <string name="pure_black_dark_mode">Klara nigra</string>
-    <string name="hide_app_block_screenshots">Kaŝi aplikaĵan enhavon kiam ŝaltumas aplikaĵojn kaj malebligi ekrankopion</string>
     <string name="hide_notification_content">Kaŝi enhavon de sciigoj</string>
     <string name="backup_and_restore">Arkivi kaj restaŭri</string>
     <string name="restore_backup">Restaŭri savkopion</string>
@@ -315,7 +304,6 @@
     <string name="backup_location">Savkopiejo</string>
     <string name="automatic_backups">Aŭtomataj savkopioj</string>
     <string name="backup_frequency">Savkopia ofteco</string>
-    <string name="file_is_missing_data">Dosiero mankas datumon.</string>
     <string name="backup_has_no_manga">Savkopio enhavas neniun mangaon.</string>
     <string name="backup_failed">Kreado de savkopio fiaskis</string>
     <string name="restore_missing_sources">Mankantaj fontoj:</string>
@@ -375,4 +363,41 @@
     <string name="type">Speco</string>
     <string name="complete">Finitaj</string>
     <string name="send_crash_report">Sendadi raportojn de rompoj</string>
+    <string name="local_invalid_format">Nevalida ĉapitra formato</string>
+    <string name="order_by">Ordigi laŭ</string>
+    <string name="grayscale">Grizoskalo</string>
+    <string name="pref_inverted_colors">Inversigita</string>
+    <string name="ascending">Kreskante</string>
+    <string name="date">Dato</string>
+    <string name="descending">Malkreskante</string>
+    <string name="select_inverse">Elekti inverse</string>
+    <string name="clear_history">Viŝi historion</string>
+    <string name="clear_history_completed">Historio viŝita</string>
+    <string name="clear_history_confirmation">Ĉu vi certas\? La tuta historio forigos.</string>
+    <string name="pref_manage_notifications">Administri sciigojn</string>
+    <string name="downloaded_chapters">Elŝutitaj ĉapitroj</string>
+    <string name="pref_update_only_non_completed">Nur ĝisdatigi okazantaj mangaojn</string>
+    <plurals name="after_minutes">
+        <item quantity="one">Post 1 minutoPost %1$s minutoj</item>
+        <item quantity="other"/>
+    </plurals>
+    <plurals name="for_n_titles">
+        <item quantity="one">Por 1 titoloPor %d titoloj</item>
+        <item quantity="other"/>
+    </plurals>
+    <string name="tap_zones">Navigaranĝo</string>
+    <string name="tap_to_see_details">Montri erarojn</string>
+    <string name="secure_screen_summary">Kaŝi aplikaĵan enhavon kiam ŝaltumas aplikaĵojn kaj malebligi ekrankopion</string>
+    <string name="statistics">Statistiko</string>
+    <string name="warning">Averto</string>
+    <string name="lock_with_biometrics">Devigi malŝlosi</string>
+    <string name="gray_background">Griza</string>
+    <string name="library_entries">Biblioteka kontribuoj</string>
+    <string name="grid_size">Elementoj vice</string>
+    <string name="trackers">Servoj</string>
+    <string name="rotation">Orientiĝa speco</string>
+    <plurals name="next_unread_chapters">
+        <item quantity="one">Sekva nelegita ĉapitro</item>
+        <item quantity="other">Sekvaj %d nelegitaj ĉapitroj</item>
+    </plurals>
 </resources>

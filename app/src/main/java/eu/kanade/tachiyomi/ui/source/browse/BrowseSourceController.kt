@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.ui.source.browse
 
-import android.app.Activity
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -9,18 +8,19 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.SearchView
 import androidx.core.view.WindowInsetsCompat.Type.ime
 import androidx.core.view.WindowInsetsCompat.Type.systemBars
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bluelinelabs.conductor.ControllerChangeHandler
+import com.bluelinelabs.conductor.ControllerChangeType
 import com.google.android.material.snackbar.Snackbar
 import eu.davidea.flexibleadapter.FlexibleAdapter
 import eu.davidea.flexibleadapter.items.IFlexible
-import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
@@ -30,9 +30,10 @@ import eu.kanade.tachiyomi.source.LocalSource
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.online.HttpSource
-import eu.kanade.tachiyomi.ui.base.controller.NucleusController
+import eu.kanade.tachiyomi.ui.base.controller.BaseCoroutineController
 import eu.kanade.tachiyomi.ui.main.FloatingSearchInterface
 import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.ui.main.SearchActivity
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsController
 import eu.kanade.tachiyomi.ui.source.BrowseController
 import eu.kanade.tachiyomi.ui.source.globalsearch.GlobalSearchController
@@ -41,8 +42,12 @@ import eu.kanade.tachiyomi.util.addOrRemoveToFavorites
 import eu.kanade.tachiyomi.util.system.connectivityManager
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.openInBrowser
+import eu.kanade.tachiyomi.util.system.toast
+import eu.kanade.tachiyomi.util.view.activityBinding
 import eu.kanade.tachiyomi.util.view.applyBottomAnimatedInsets
+import eu.kanade.tachiyomi.util.view.fullAppBarHeight
 import eu.kanade.tachiyomi.util.view.inflate
+import eu.kanade.tachiyomi.util.view.isControllerVisible
 import eu.kanade.tachiyomi.util.view.requestFilePermissionsSafe
 import eu.kanade.tachiyomi.util.view.scrollViewWith
 import eu.kanade.tachiyomi.util.view.setOnQueryTextChangeListener
@@ -50,14 +55,16 @@ import eu.kanade.tachiyomi.util.view.snack
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
 import eu.kanade.tachiyomi.widget.AutofitRecyclerView
 import eu.kanade.tachiyomi.widget.EmptyView
+import eu.kanade.tachiyomi.widget.LinearLayoutManagerAccurateOffset
 import timber.log.Timber
 import uy.kohesive.injekt.injectLazy
+import kotlin.math.roundToInt
 
 /**
  * Controller to manage the catalogues available in the app.
  */
 open class BrowseSourceController(bundle: Bundle) :
-    NucleusController<BrowseSourceControllerBinding, BrowseSourcePresenter>(bundle),
+    BaseCoroutineController<BrowseSourceControllerBinding, BrowseSourcePresenter>(bundle),
     FlexibleAdapter.OnItemClickListener,
     FlexibleAdapter.OnItemLongClickListener,
     FloatingSearchInterface,
@@ -66,7 +73,8 @@ open class BrowseSourceController(bundle: Bundle) :
     constructor(
         source: CatalogueSource,
         searchQuery: String? = null,
-        smartSearchConfig: BrowseController.SmartSearchConfig? = null
+        smartSearchConfig: BrowseController.SmartSearchConfig? = null,
+        useLatest: Boolean = false,
     ) : this(
         Bundle().apply {
             putLong(SOURCE_ID_KEY, source.id)
@@ -78,13 +86,14 @@ open class BrowseSourceController(bundle: Bundle) :
             if (smartSearchConfig != null) {
                 putParcelable(SMART_SEARCH_CONFIG_KEY, smartSearchConfig)
             }
-        }
+            putBoolean(USE_LATEST_KEY, useLatest)
+        },
     )
 
     constructor(source: CatalogueSource) : this(
         Bundle().apply {
             putLong(SOURCE_ID_KEY, source.id)
-        }
+        },
     )
 
     /**
@@ -113,19 +122,37 @@ open class BrowseSourceController(bundle: Bundle) :
     private var progressItem: ProgressItem? = null
 
     /** Current filter sheet */
-    var filterSheet: SourceFilterSheet? = null
+    private var filterSheet: SourceFilterSheet? = null
+    private var lastPosition: Int = -1
+
+    private val isBehindGlobalSearch: Boolean
+        get() = router.backstackSize >= 2 && router.backstack[router.backstackSize - 2].controller is GlobalSearchController
 
     init {
         setHasOptionsMenu(true)
     }
 
+    override val mainRecycler: RecyclerView?
+        get() = recycler
+
     override fun getTitle(): String? {
-        return searchTitle(presenter.source.name)
+        return if (presenter.sourceIsInitialized) presenter.source.name else null
     }
 
-    override fun createPresenter(): BrowseSourcePresenter {
-        return BrowseSourcePresenter(args.getLong(SOURCE_ID_KEY), args.getString(SEARCH_QUERY_KEY))
+    override fun getSearchTitle(): String? {
+        return if (presenter.sourceIsInitialized) searchTitle(presenter.source.name) else null
     }
+
+    // disabling for now, one day maybe it will source icons will good
+//    override fun getBigIcon(): Drawable? {
+//        return presenter.source.icon()
+//    }
+
+    override val presenter = BrowseSourcePresenter(
+        args.getLong(SOURCE_ID_KEY),
+        args.getString(SEARCH_QUERY_KEY),
+        args.getBoolean(USE_LATEST_KEY),
+    )
 
     override fun createBinding(inflater: LayoutInflater) = BrowseSourceControllerBinding.inflate(inflater)
 
@@ -138,7 +165,23 @@ open class BrowseSourceController(bundle: Bundle) :
 
         binding.fab.isVisible = presenter.sourceFilters.isNotEmpty()
         binding.fab.setOnClickListener { showFilters() }
-        binding.progress.isVisible = true
+        activityBinding?.appBar?.y = 0f
+        activityBinding?.appBar?.updateAppBarAfterY(recycler)
+        activityBinding?.appBar?.lockYPos = true
+        if (!presenter.sourceIsInitialized) {
+            activity?.toast(R.string.source_not_installed)
+            if (activity is SearchActivity) {
+                activity?.finish()
+            } else {
+                router.popCurrentController()
+            }
+            return
+        }
+        if (presenter.items.isNotEmpty()) {
+            onAddPage(1, presenter.items)
+        } else {
+            binding.progress.isVisible = true
+        }
         requestFilePermissionsSafe(301, preferences, presenter.source is LocalSource)
     }
 
@@ -151,18 +194,22 @@ open class BrowseSourceController(bundle: Bundle) :
 
     private fun setupRecycler(view: View) {
         var oldPosition = RecyclerView.NO_POSITION
+        var oldOffset = 0f
         val oldRecycler = binding.catalogueView.getChildAt(1)
         if (oldRecycler is RecyclerView) {
-            oldPosition = (oldRecycler.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition()
+            oldPosition = (oldRecycler.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition()
+                .takeIf { it != RecyclerView.NO_POSITION }
+                ?: (oldRecycler.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition()
+            oldOffset = oldRecycler.layoutManager?.findViewByPosition(oldPosition)?.y?.minus(oldRecycler.paddingTop) ?: 0f
             oldRecycler.adapter = null
 
             binding.catalogueView.removeView(oldRecycler)
         }
 
-        val recycler = if (presenter.isListMode) {
+        val recycler = if (presenter.prefs.browseAsList().get()) {
             RecyclerView(view.context).apply {
                 id = R.id.recycler
-                layoutManager = LinearLayoutManager(context)
+                layoutManager = LinearLayoutManagerAccurateOffset(context)
                 layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                 addItemDecoration(DividerItemDecoration(context, DividerItemDecoration.VERTICAL))
             }
@@ -184,6 +231,7 @@ open class BrowseSourceController(bundle: Bundle) :
         recycler.setHasFixedSize(true)
         recycler.adapter = adapter
 
+        binding.catalogueView.addView(recycler, 1)
         scrollViewWith(
             recycler,
             true,
@@ -193,7 +241,15 @@ open class BrowseSourceController(bundle: Bundle) :
                         bottomMargin = insets.getInsets(systemBars() or ime()).bottom + 16.dpToPx
                     }
                 }
-            }
+                val bigToolbarHeight = fullAppBarHeight ?: 0
+                binding.progress.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                    topMargin = (bigToolbarHeight + insets.getInsets(systemBars()).top) / 2
+                }
+                binding.emptyView.updatePadding(
+                    top = (bigToolbarHeight + insets.getInsets(systemBars()).top),
+                    bottom = insets.getInsets(systemBars()).bottom,
+                )
+            },
         )
         binding.fab.applyBottomAnimatedInsets(16.dpToPx)
 
@@ -206,12 +262,14 @@ open class BrowseSourceController(bundle: Bundle) :
                         binding.fab.shrink()
                     }
                 }
-            }
+            },
         )
 
-        binding.catalogueView.addView(recycler, 1)
         if (oldPosition != RecyclerView.NO_POSITION) {
-            recycler.layoutManager?.scrollToPosition(oldPosition)
+            (recycler.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(oldPosition, oldOffset.roundToInt())
+            if (oldPosition > 0 && (activity as? MainActivity)?.currentToolbar != activityBinding?.searchToolbar) {
+                activityBinding?.appBar?.useSearchToolbarForMenu(true)
+            }
         }
         this.recycler = recycler
     }
@@ -220,58 +278,63 @@ open class BrowseSourceController(bundle: Bundle) :
         inflater.inflate(R.menu.browse_source, menu)
 
         // Initialize search menu
-        val searchItem = menu.findItem(R.id.action_search)
-        val searchView = searchItem.actionView as SearchView
+        val searchItem = activityBinding?.searchToolbar?.searchItem
+        val searchView = activityBinding?.searchToolbar?.searchView
 
-        val query = presenter.query
-        if (query.isNotBlank()) {
-            searchItem.expandActionView()
-            searchView.setQuery(query, true)
-            searchView.clearFocus()
+        activityBinding?.searchToolbar?.setQueryHint("", !isBehindGlobalSearch && presenter.query.isBlank())
+        if (presenter.query.isNotBlank()) {
+            searchItem?.expandActionView()
+            searchView?.setQuery(presenter.query, true)
+            searchView?.clearFocus()
+        } else if (activityBinding?.searchToolbar?.isSearchExpanded == true) {
+            searchItem?.collapseActionView()
+            searchView?.setQuery("", true)
         }
 
-//        val searchEventsObservable = searchView.queryTextChangeEvents()
-//            .skip(1)
-//            .filter { router.backstack.lastOrNull()?.controller == this@BrowseSourceController }
-//            .share()
-//        val writingObservable = searchEventsObservable
-//            .filter { !it.isSubmitted }
-//            .debounce(1250, TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
-//        val submitObservable = searchEventsObservable
-//            .filter { it.isSubmitted }
-//
-//        searchViewSubscription?.unsubscribe()
-//        searchViewSubscription = Observable.merge(writingObservable, submitObservable)
-//            .map { it.queryText().toString() }
-//            .subscribeUntilDestroy { searchWithQuery(it) }
+        updatePopularLatestIcon(menu)
 
         setOnQueryTextChangeListener(searchView, onlyOnSubmit = true, hideKbOnSubmit = true) {
             searchWithQuery(it ?: "")
             true
         }
-
-        searchItem.fixExpand(
-            onExpand = { invalidateMenuOnExpand() },
-            onCollapse = {
-                if (router.backstackSize >= 2 && router.backstack[router.backstackSize - 2].controller is GlobalSearchController) {
-                    router.popController(this)
-                } else {
-                    searchWithQuery("")
-                }
-                true
-            }
-        )
-
         // Show next display mode
-        menu.findItem(R.id.action_display_mode).apply {
-            val icon = if (presenter.isListMode) {
+        updateDisplayMenuItem(menu)
+    }
+
+    private fun updatePopularLatestIcon(menu: Menu?) {
+        menu?.findItem(R.id.action_popular_latest)?.apply {
+            val icon = if (!presenter.useLatest) {
+                R.drawable.ic_new_releases_24dp
+            } else {
+                R.drawable.ic_heart_24dp
+            }
+            setIcon(icon)
+            val titleRes = if (!presenter.useLatest) {
+                R.string.latest
+            } else {
+                R.string.popular
+            }
+            setTitle(titleRes)
+        }
+    }
+
+    private fun updateDisplayMenuItem(menu: Menu?, isListMode: Boolean? = null) {
+        menu?.findItem(R.id.action_display_mode)?.apply {
+            val icon = if (isListMode ?: presenter.prefs.browseAsList().get()) {
                 R.drawable.ic_view_module_24dp
             } else {
                 R.drawable.ic_view_list_24dp
             }
             setIcon(icon)
         }
-        hideItemsIfExpanded(searchItem, menu)
+    }
+
+    override fun onActionViewCollapse(item: MenuItem?) {
+        if (isBehindGlobalSearch) {
+            router.popController(this)
+        } else {
+            searchWithQuery("")
+        }
     }
 
     override fun onPrepareOptionsMenu(menu: Menu) {
@@ -279,6 +342,8 @@ open class BrowseSourceController(bundle: Bundle) :
 
         val isHttpSource = presenter.source is HttpSource
         menu.findItem(R.id.action_open_in_web_view).isVisible = isHttpSource
+        val supportsLatest = (presenter.source as? CatalogueSource)?.supportsLatest == true
+        menu.findItem(R.id.action_popular_latest).isVisible = supportsLatest
 
         val isLocalSource = presenter.source is LocalSource
         menu.findItem(R.id.action_local_source_help).isVisible = isLocalSource
@@ -290,6 +355,7 @@ open class BrowseSourceController(bundle: Bundle) :
             R.id.action_display_mode -> swapDisplayMode()
             R.id.action_open_in_web_view -> openInWebView()
             R.id.action_local_source_help -> openLocalSourceHelpGuide()
+            R.id.action_popular_latest -> swapPopularLatest()
             else -> return super.onOptionsItemSelected(item)
         }
         return true
@@ -333,12 +399,14 @@ open class BrowseSourceController(bundle: Bundle) :
                     matches = false
                     break
                 }
+                if (!matches) break
             }
             if (!matches) {
-                val allDefault = presenter.sourceFilters == presenter.source.getFilterList()
+                val allDefault = presenter.filtersMatchDefault()
                 showProgressBar()
                 adapter?.clear()
                 presenter.setSourceFilter(if (allDefault) FilterList() else presenter.sourceFilters)
+                updatePopLatestIcons()
             }
         }
 
@@ -373,12 +441,16 @@ open class BrowseSourceController(bundle: Bundle) :
             if (sourceFilter is Filter.Group<*>) {
                 for (filter in sourceFilter.state) {
                     if (filter is Filter<*> &&
-                        if (useContains) filter.name.contains(genreName, true)
-                        else filter.name.equals(genreName, true)
+                        if (useContains) {
+                            filter.name.contains(genreName, true)
+                        } else {
+                            filter.name.equals(genreName, true)
+                        }
                     ) {
                         when (filter) {
                             is Filter.TriState -> filter.state = 1
                             is Filter.CheckBox -> filter.state = true
+                            else -> break
                         }
                         filterList = presenter.sourceFilters
                         break@filter
@@ -387,8 +459,11 @@ open class BrowseSourceController(bundle: Bundle) :
             } else if (sourceFilter is Filter.Select<*>) {
                 val index = sourceFilter.values.filterIsInstance<String>()
                     .indexOfFirst {
-                        if (useContains) it.contains(genreName, true)
-                        else it.equals(genreName, true)
+                        if (useContains) {
+                            it.contains(genreName, true)
+                        } else {
+                            it.equals(genreName, true)
+                        }
                     }
 
                 if (index != -1) {
@@ -420,16 +495,23 @@ open class BrowseSourceController(bundle: Bundle) :
         val activity = activity ?: return
         val intent = WebViewActivity.newIntent(
             activity,
-            source.id,
             source.baseUrl,
-            presenter
-                .source.name
+            source.id,
+            source.name,
         )
         startActivity(intent)
     }
 
     private fun openLocalSourceHelpGuide() {
         activity?.openInBrowser(LocalSource.HELP_URL)
+    }
+
+    override fun onChangeStarted(handler: ControllerChangeHandler, type: ControllerChangeType) {
+        super.onChangeStarted(handler, type)
+        if (type == ControllerChangeType.POP_ENTER && lastPosition > -1) {
+            adapter?.notifyItemChanged(lastPosition, false)
+            lastPosition = -1
+        }
     }
 
     /**
@@ -446,7 +528,8 @@ open class BrowseSourceController(bundle: Bundle) :
         showProgressBar()
         adapter?.clear()
 
-        presenter.restartPager(newQuery, presenter.sourceFilters)
+        presenter.restartPager(newQuery)
+        updatePopLatestIcons()
     }
 
     /**
@@ -463,19 +546,8 @@ open class BrowseSourceController(bundle: Bundle) :
             resetProgressItem()
         }
         adapter.onLoadMoreComplete(mangas)
-    }
-
-    override fun onActivityResumed(activity: Activity) {
-        super.onActivityResumed(activity)
-
-        if (BuildConfig.DEBUG && presenter.query.isBlank()) {
-            val searchItem =
-                (activity as? MainActivity)?.binding?.cardToolbar?.menu?.findItem(R.id.action_search)
-            val searchView = searchItem?.actionView as? SearchView ?: return
-            setOnQueryTextChangeListener(searchView, onlyOnSubmit = true, hideKbOnSubmit = true) {
-                searchWithQuery(it ?: "")
-                true
-            }
+        if (isControllerVisible) {
+            activityBinding?.appBar?.lockYPos = false
         }
     }
 
@@ -508,7 +580,7 @@ open class BrowseSourceController(bundle: Bundle) :
 
             actions += if (presenter.source is LocalSource) {
                 EmptyView.Action(
-                    R.string.local_source_help_guide
+                    R.string.local_source_help_guide,
                 ) { openLocalSourceHelpGuide() }
             } else {
                 EmptyView.Action(R.string.retry, retryAction)
@@ -516,20 +588,26 @@ open class BrowseSourceController(bundle: Bundle) :
 
             if (presenter.source is HttpSource) {
                 actions += EmptyView.Action(
-                    R.string.open_in_webview
+                    R.string.open_in_webview,
                 ) { openInWebView() }
             }
 
             binding.emptyView.show(
-                if (presenter.source is HttpSource) R.drawable.ic_browse_off_24dp
-                else R.drawable.ic_local_library_24dp,
+                if (presenter.source is HttpSource) {
+                    R.drawable.ic_browse_off_24dp
+                } else {
+                    R.drawable.ic_local_library_24dp
+                },
                 message,
-                actions
+                actions,
             )
         } else {
             snack = binding.sourceLayout.snack(message, Snackbar.LENGTH_INDEFINITE) {
                 setAction(R.string.retry, retryAction)
             }
+        }
+        if (isControllerVisible) {
+            activityBinding?.appBar?.lockYPos = false
         }
     }
 
@@ -581,20 +659,47 @@ open class BrowseSourceController(bundle: Bundle) :
     /**
      * Swaps the current display mode.
      */
-    fun swapDisplayMode() {
+    private fun swapDisplayMode() {
         val view = view ?: return
         val adapter = adapter ?: return
 
-        presenter.swapDisplayMode()
-        val isListMode = presenter.isListMode
-        activity?.invalidateOptionsMenu()
+        val isListMode = !presenter.prefs.browseAsList().get()
+        presenter.prefs.browseAsList().set(isListMode)
+        listOf(activityBinding?.toolbar?.menu, activityBinding?.searchToolbar?.menu).forEach {
+            updateDisplayMenuItem(it, isListMode)
+        }
         setupRecycler(view)
-        if (!isListMode || !view.context.connectivityManager.isActiveNetworkMetered) {
-            // Initialize mangas if going to grid view or if over wifi when going to list view
+        // Initialize mangas if not on a metered connection
+        if (!view.context.connectivityManager.isActiveNetworkMetered) {
             val mangas = (0 until adapter.itemCount).mapNotNull {
                 (adapter.getItem(it) as? BrowseSourceItem)?.manga
             }
             presenter.initializeMangas(mangas)
+        }
+    }
+
+    private fun swapPopularLatest() {
+        val adapter = adapter ?: return
+
+        presenter.useLatest = !presenter.useLatest
+        showProgressBar()
+        adapter.clear()
+        updatePopLatestIcons()
+
+        val searchItem = activityBinding?.searchToolbar?.searchItem
+        searchItem?.collapseActionView()
+
+        presenter.appliedFilters = FilterList()
+        val newFilters = presenter.source.getFilterList()
+        presenter.sourceFilters = newFilters
+        presenter.filtersChanged = false
+
+        presenter.restartPager("")
+    }
+
+    private fun updatePopLatestIcons() {
+        listOf(activityBinding?.toolbar?.menu, activityBinding?.searchToolbar?.menu).forEach {
+            updatePopularLatestIcon(it)
         }
     }
 
@@ -644,7 +749,7 @@ open class BrowseSourceController(bundle: Bundle) :
     override fun onItemClick(view: View?, position: Int): Boolean {
         val item = adapter?.getItem(position) as? BrowseSourceItem ?: return false
         router.pushController(MangaDetailsController(item.manga, true).withFadeTransaction())
-
+        lastPosition = position
         return false
     }
 
@@ -667,12 +772,14 @@ open class BrowseSourceController(bundle: Bundle) :
             preferences,
             view,
             activity,
+            presenter.sourceManager,
+            this,
             onMangaAdded = {
                 adapter?.notifyItemChanged(position)
                 snack = view.snack(R.string.added_to_library)
             },
             onMangaMoved = { adapter?.notifyItemChanged(position) },
-            onMangaDeleted = { presenter.confirmDeletion(manga) }
+            onMangaDeleted = { presenter.confirmDeletion(manga) },
         )
         if (snack?.duration == Snackbar.LENGTH_INDEFINITE) {
             (activity as? MainActivity)?.setUndoSnackBar(snack)
@@ -683,6 +790,7 @@ open class BrowseSourceController(bundle: Bundle) :
         const val SOURCE_ID_KEY = "sourceId"
 
         const val SEARCH_QUERY_KEY = "searchQuery"
+        const val USE_LATEST_KEY = "useLatest"
         const val SMART_SEARCH_CONFIG_KEY = "smartSearchConfig"
     }
 }

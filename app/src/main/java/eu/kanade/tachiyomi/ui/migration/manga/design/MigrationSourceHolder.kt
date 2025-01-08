@@ -16,9 +16,7 @@ class MigrationSourceHolder(view: View, val adapter: MigrationSourceAdapter) :
     }
 
     fun bind(source: HttpSource, sourceEnabled: Boolean) {
-        // Set capitalized title.
-        val sourceName = if (adapter.isMultiLanguage) source.toString() else source.name.capitalize()
-        binding.title.text = sourceName
+        binding.title.text = source.nameBasedOnEnabledLanguages(adapter.enabledLanguages, adapter.extensionManager)
         // Update circle letter image.
         itemView.post {
             val icon = source.icon()

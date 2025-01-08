@@ -33,7 +33,8 @@ class MaterialMenuSheet(
     selectedId: Int? = null,
     maxHeight: Int? = null,
     showDivider: Boolean = false,
-    onMenuItemClicked: (MaterialMenuSheet, Int) -> Boolean
+    subtitle: String? = null,
+    onMenuItemClicked: (MaterialMenuSheet, Int) -> Boolean,
 ) : E2EBottomSheetDialog<BottomMenuSheetBinding>(activity) {
 
     override fun createBinding(inflater: LayoutInflater) = BottomMenuSheetBinding.inflate(inflater)
@@ -50,7 +51,7 @@ class MaterialMenuSheet(
                 matchConstraintMaxHeight =
                     min(
                         (maxHeight ?: fullHeight) + (insets?.bottom ?: 0),
-                        fullHeight - (insets?.top ?: 0) - binding.titleLayout.height - 26.dpToPx
+                        fullHeight - (insets?.top ?: 0) - binding.titleLayout.height - 26.dpToPx,
                     )
             }
         }
@@ -76,8 +77,11 @@ class MaterialMenuSheet(
         sheetBehavior.skipCollapsed = true
 
         binding.menuSheetRecycler.setOnApplyWindowInsetsListener(RecyclerWindowInsetsListener)
-        binding.titleLayout.isVisible = title != null
+        binding.titleLayout.isVisible = title != null || subtitle != null
+        binding.toolbarTitle.isVisible = title != null
         binding.toolbarTitle.text = title
+        binding.toolbarSubtitle.isVisible = subtitle != null
+        binding.toolbarSubtitle.text = subtitle
 
         if (selectedId != null) {
             val pos = max(items.indexOfFirst { it.id == selectedId }, 0)
@@ -86,7 +90,7 @@ class MaterialMenuSheet(
                 binding.root.post {
                     binding.menuSheetRecycler.scrollBy(
                         0,
-                        pos * 48.dpToPx - binding.menuSheetRecycler.height / 2
+                        pos * 48.dpToPx - binding.menuSheetRecycler.height / 2,
                     )
                 }
             }
@@ -104,7 +108,7 @@ class MaterialMenuSheet(
 
             elevationAnimator = ValueAnimator.ofArgb(
                 if (elevate) nonElevateColor else elevateColor,
-                if (elevate) elevateColor else nonElevateColor
+                if (elevate) elevateColor else nonElevateColor,
             )
 
             elevationAnimator?.addUpdateListener {
@@ -114,14 +118,16 @@ class MaterialMenuSheet(
         }
         elevate(binding.menuSheetRecycler.canScrollVertically(-1))
         if (binding.titleLayout.isVisible) {
-            binding.menuSheetRecycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                    val notAtTop = binding.menuSheetRecycler.canScrollVertically(-1)
-                    if (notAtTop != isElevated) {
-                        elevate(notAtTop)
+            binding.menuSheetRecycler.addOnScrollListener(
+                object : RecyclerView.OnScrollListener() {
+                    override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                        val notAtTop = binding.menuSheetRecycler.canScrollVertically(-1)
+                        if (notAtTop != isElevated) {
+                            elevate(notAtTop)
+                        }
                     }
-                }
-            })
+                },
+            )
         }
     }
 
@@ -145,6 +151,6 @@ class MaterialMenuSheet(
         @DrawableRes val drawable: Int = 0,
         @StringRes val textRes: Int = 0,
         val text: String? = null,
-        var endDrawableRes: Int = 0
+        var endDrawableRes: Int = 0,
     )
 }

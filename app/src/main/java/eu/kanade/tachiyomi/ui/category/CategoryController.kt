@@ -10,6 +10,7 @@ import com.google.android.material.snackbar.Snackbar
 import eu.davidea.flexibleadapter.FlexibleAdapter
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.databinding.CategoriesControllerBinding
+import eu.kanade.tachiyomi.ui.base.SmallToolbarInterface
 import eu.kanade.tachiyomi.ui.base.controller.BaseController
 import eu.kanade.tachiyomi.ui.category.CategoryPresenter.Companion.CREATE_CATEGORY_ORDER
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -25,6 +26,7 @@ class CategoryController(bundle: Bundle? = null) :
     BaseController<CategoriesControllerBinding>(bundle),
     FlexibleAdapter.OnItemClickListener,
     FlexibleAdapter.OnItemMoveListener,
+    SmallToolbarInterface,
     CategoryAdapter.CategoryItemListener {
 
     /**
@@ -58,7 +60,7 @@ class CategoryController(bundle: Bundle? = null) :
      */
     override fun onViewCreated(view: View) {
         super.onViewCreated(view)
-        liftAppbarWith(binding.recycler, true)
+        liftAppbarWith(binding.recycler, true, changeMarginsInstead = true)
 
         adapter = CategoryAdapter(this@CategoryController)
         binding.recycler.layoutManager = LinearLayoutManager(view.context)
@@ -150,7 +152,7 @@ class CategoryController(bundle: Bundle? = null) :
                             super.onDismissed(transientBottomBar, event)
                             if (!undoing) confirmDelete()
                         }
-                    }
+                    },
                 )
             }
         (activity as? MainActivity)?.setUndoSnackBar(snack)

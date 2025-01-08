@@ -7,7 +7,6 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.Track
 import eu.kanade.tachiyomi.data.track.TrackService
 import eu.kanade.tachiyomi.data.track.model.TrackSearch
-import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
 import eu.kanade.tachiyomi.data.track.updateNewTrackInfo
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -42,6 +41,8 @@ class Kitsu(private val context: Context, id: Int) : TrackService(id) {
 
     override fun getLogo() = R.drawable.ic_tracker_kitsu
 
+    override fun getTrackerColor() = Color.rgb(253, 117, 92)
+
     override fun getLogoColor() = Color.rgb(51, 37, 50)
 
     override fun getStatusList(): List<Int> {
@@ -50,7 +51,9 @@ class Kitsu(private val context: Context, id: Int) : TrackService(id) {
 
     override fun isCompletedStatus(index: Int) = getStatusList()[index] == COMPLETED
 
-    override fun completedStatus(): Int = MyAnimeList.COMPLETED
+    override fun completedStatus(): Int = COMPLETED
+    override fun readingStatus() = READING
+    override fun planningStatus() = PLAN_TO_READ
 
     override fun getStatus(status: Int): String = with(context) {
         when (status) {
@@ -88,21 +91,15 @@ class Kitsu(private val context: Context, id: Int) : TrackService(id) {
         return df.format(track.score)
     }
 
-    override suspend fun update(track: Track, setToReadStatus: Boolean): Track {
-        if (setToReadStatus && track.status == PLAN_TO_READ && track.last_chapter_read != 0) {
-            track.status = READING
-        }
-        if (track.total_chapters != 0 && track.last_chapter_read == track.total_chapters) {
-            track.status = COMPLETED
-        }
-
+    override suspend fun update(track: Track, setToRead: Boolean): Track {
+        updateTrackStatus(track, setToRead, setToComplete = true, mustReadToComplete = false)
         return api.updateLibManga(track)
     }
 
     override suspend fun add(track: Track): Track {
         track.score = DEFAULT_SCORE
         track.status = DEFAULT_STATUS
-        updateNewTrackInfo(track, PLAN_TO_READ)
+        updateNewTrackInfo(track)
         return api.addLibManga(track, getUserId())
     }
 
@@ -157,12 +154,12 @@ class Kitsu(private val context: Context, id: Int) : TrackService(id) {
     }
 
     fun saveToken(oauth: OAuth?) {
-        preferences.trackToken(this).set(json.encodeToString(oauth))
+        trackPreferences.trackToken(this).set(json.encodeToString(oauth))
     }
 
     fun restoreToken(): OAuth? {
         return try {
-            json.decodeFromString<OAuth>(preferences.trackToken(this).get())
+            json.decodeFromString<OAuth>(trackPreferences.trackToken(this).get())
         } catch (e: Exception) {
             null
         }

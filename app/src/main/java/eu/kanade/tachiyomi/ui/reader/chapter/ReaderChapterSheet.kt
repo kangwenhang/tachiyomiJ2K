@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -19,7 +20,7 @@ import com.mikepenz.fastadapter.listeners.ClickEventHook
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.databinding.ReaderChaptersSheetBinding
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
-import eu.kanade.tachiyomi.ui.reader.ReaderPresenter
+import eu.kanade.tachiyomi.ui.reader.ReaderViewModel
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.isInNightMode
@@ -28,6 +29,7 @@ import eu.kanade.tachiyomi.util.view.collapse
 import eu.kanade.tachiyomi.util.view.expand
 import eu.kanade.tachiyomi.util.view.isCollapsed
 import eu.kanade.tachiyomi.util.view.isExpanded
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -37,13 +39,14 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
     LinearLayout(context, attrs) {
 
     var sheetBehavior: BottomSheetBehavior<View>? = null
-    lateinit var presenter: ReaderPresenter
+    lateinit var viewModel: ReaderViewModel
     var adapter: FastAdapter<ReaderChapterItem>? = null
     private val itemAdapter = ItemAdapter<ReaderChapterItem>()
     var selectedChapterId = -1L
 
     var loadingPos = 0
     lateinit var binding: ReaderChaptersSheetBinding
+    var lastScale = 1f
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -51,7 +54,7 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
     }
 
     fun setup(activity: ReaderActivity) {
-        presenter = activity.presenter
+        viewModel = activity.viewModel
         val fullPrimary = activity.getResourceColor(R.attr.colorSurface)
 
         val primary = ColorUtils.setAlphaComponent(fullPrimary, 200)
@@ -60,8 +63,10 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
         val navPrimary = ColorUtils.setAlphaComponent(
             if (hasLightNav) {
                 fullPrimary
-            } else Color.BLACK,
-            200
+            } else {
+                Color.BLACK
+            },
+            200,
         )
         sheetBehavior = BottomSheetBehavior.from(this)
         binding.chaptersButton.setOnClickListener {
@@ -76,7 +81,7 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
             binding.chapterRecycler.alpha = if (sheetBehavior.isExpanded()) 1f else 0f
             binding.chapterRecycler.isClickable = sheetBehavior.isExpanded()
             binding.chapterRecycler.isFocusable = sheetBehavior.isExpanded()
-            val canShowNav = presenter.getCurrentChapter()?.pages?.size ?: 1 > 1
+            val canShowNav = viewModel.getCurrentChapter()?.pages?.size ?: 1 > 1
             if (canShowNav) {
                 activity.binding.readerNav.root.isVisible = sheetBehavior.isCollapsed()
             }
@@ -85,6 +90,7 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
         sheetBehavior?.addBottomSheetCallback(
             object : BottomSheetBehavior.BottomSheetCallback() {
                 override fun onSlide(bottomSheet: View, progress: Float) {
+                    binding.root.isVisible = true
                     binding.pill.alpha = (1 - max(0f, progress)) * 0.25f
                     val trueProgress = max(progress, 0f)
                     activity.binding.readerNav.root.alpha = (1 - abs(progress)).coerceIn(0f, 1f)
@@ -95,15 +101,25 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
                         activity.window.navigationBarColor =
                             lerpColor(ColorUtils.setAlphaComponent(navPrimary, if (hasLightNav) 0 else 179), navPrimary, trueProgress)
                     }
+                    if (lastScale != 1f && scaleY != 1f) {
+                        val scaleProgress = ((1f - progress) * (1f - lastScale)) + lastScale
+                        scaleX = scaleProgress
+                        scaleY = scaleProgress
+                        for (i in 0 until childCount) {
+                            val childView = getChildAt(i)
+                            childView.scaleY = scaleProgress
+                        }
+                    }
                 }
 
                 override fun onStateChanged(p0: View, state: Int) {
-                    val canShowNav = presenter.getCurrentChapter()?.pages?.size ?: 1 > 1
+                    val canShowNav = (viewModel.getCurrentChapter()?.pages?.size ?: 1) > 1
                     if (state == BottomSheetBehavior.STATE_COLLAPSED) {
                         sheetBehavior?.isHideable = false
                         (binding.chapterRecycler.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(
-                            adapter?.getPosition(presenter.getCurrentChapter()?.chapter?.id ?: 0L) ?: 0,
-                            binding.chapterRecycler.height / 2 - 30.dpToPx
+                            adapter?.getPosition(viewModel.getCurrentChapter()?.chapter?.id ?: 0L)
+                                ?: 0,
+                            binding.chapterRecycler.height / 2 - 30.dpToPx,
                         )
                         if (canShowNav) {
                             activity.binding.readerNav.root.isVisible = true
@@ -121,18 +137,45 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
                         }
                         activity.binding.readerNav.root.alpha = 0f
                         binding.chapterRecycler.alpha = 1f
-                        if (activity.sheetManageNavColor) activity.window.navigationBarColor = navPrimary
+                        if (activity.sheetManageNavColor) {
+                            activity.window.navigationBarColor =
+                                navPrimary
+                        }
                     }
                     if (state == BottomSheetBehavior.STATE_HIDDEN) {
                         activity.binding.readerNav.root.alpha = 0f
                         if (canShowNav) {
                             activity.binding.readerNav.root.isInvisible = true
                         }
+                        binding.root.isInvisible = true
+                    } else if (binding.root.isVisible) {
+                        binding.root.isVisible = true
                     }
-                    binding.chapterRecycler.isClickable = state == BottomSheetBehavior.STATE_EXPANDED
-                    binding.chapterRecycler.isFocusable = state == BottomSheetBehavior.STATE_EXPANDED
+                    binding.chapterRecycler.isClickable =
+                        state == BottomSheetBehavior.STATE_EXPANDED
+                    binding.chapterRecycler.isFocusable =
+                        state == BottomSheetBehavior.STATE_EXPANDED
+                    activity.reEnableBackPressedCallBack()
+
+                    if ((
+                        state == BottomSheetBehavior.STATE_COLLAPSED ||
+                            state == BottomSheetBehavior.STATE_EXPANDED ||
+                            state == BottomSheetBehavior.STATE_HIDDEN
+                        ) &&
+                        scaleY != 1f
+                    ) {
+                        scaleX = 1f
+                        scaleY = 1f
+                        pivotY = 0f
+                        translationX = 0f
+                        for (i in 0 until childCount) {
+                            val childView = getChildAt(i)
+                            childView.scaleY = 1f
+                        }
+                        lastScale = 1f
+                    }
                 }
-            }
+            },
         )
 
         adapter = FastAdapter.with(itemAdapter)
@@ -141,15 +184,18 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
             if (!sheetBehavior.isExpanded() || activity.isLoading) {
                 false
             } else {
-                if (item.chapter.id != presenter.getCurrentChapter()?.chapter?.id) {
+                if (item.chapter.id != viewModel.getCurrentChapter()?.chapter?.id) {
                     activity.binding.readerNav.leftChapter.isInvisible = true
                     activity.binding.readerNav.rightChapter.isInvisible = true
+                    activity.isScrollingThroughPagesOrChapters = true
 
-                    presenter.loadChapter(item.chapter)
                     loadingPos = position
                     val itemView = (binding.chapterRecycler.findViewHolderForAdapterPosition(position) as? ReaderChapterItem.ViewHolder)?.binding
                     itemView?.bookmarkImage?.isVisible = false
                     itemView?.progress?.isVisible = true
+                    activity.lifecycleScope.launch {
+                        activity.loadChapter(item.chapter)
+                    }
                 }
                 true
             }
@@ -168,33 +214,38 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
                     v: View,
                     position: Int,
                     fastAdapter: FastAdapter<ReaderChapterItem>,
-                    item: ReaderChapterItem
+                    item: ReaderChapterItem,
                 ) {
                     if (!activity.isLoading && sheetBehavior.isExpanded()) {
-                        presenter.toggleBookmark(item.chapter)
+                        viewModel.toggleBookmark(item.chapter)
                         refreshList()
                     }
                 }
-            }
+            },
         )
 
         backgroundTintList = ColorStateList.valueOf(
-            if (!sheetBehavior.isExpanded()) primary
-            else fullPrimary
+            if (!sheetBehavior.isExpanded()) {
+                primary
+            } else {
+                fullPrimary
+            },
         )
 
-        binding.chapterRecycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                super.onScrollStateChanged(recyclerView, newState)
-                if (newState == RecyclerView.SCROLL_STATE_IDLE ||
-                    newState == RecyclerView.SCROLL_STATE_SETTLING
-                ) {
-                    sheetBehavior?.isDraggable = true
-                } else {
-                    sheetBehavior?.isDraggable = !recyclerView.canScrollVertically(-1)
+        binding.chapterRecycler.addOnScrollListener(
+            object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    super.onScrollStateChanged(recyclerView, newState)
+                    if (newState == RecyclerView.SCROLL_STATE_IDLE ||
+                        newState == RecyclerView.SCROLL_STATE_SETTLING
+                    ) {
+                        sheetBehavior?.isDraggable = true
+                    } else {
+                        sheetBehavior?.isDraggable = !recyclerView.canScrollVertically(-1)
+                    }
                 }
-            }
-        })
+            },
+        )
 
         binding.chapterRecycler.layoutManager = LinearLayoutManager(context)
         refreshList()
@@ -208,15 +259,15 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
 
     fun refreshList() {
         launchUI {
-            val chapters = presenter.getChapters()
+            val chapters = viewModel.getChapters()
 
             selectedChapterId = chapters.find { it.isCurrent }?.chapter?.id ?: -1L
             itemAdapter.clear()
             itemAdapter.add(chapters)
 
             (binding.chapterRecycler.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(
-                adapter?.getPosition(presenter.getCurrentChapter()?.chapter?.id ?: 0L) ?: 0,
-                binding.chapterRecycler.height / 2 - 30.dpToPx
+                adapter?.getPosition(viewModel.getCurrentChapter()?.chapter?.id ?: 0L) ?: 0,
+                binding.chapterRecycler.height / 2 - 30.dpToPx,
             )
         }
     }
@@ -227,7 +278,7 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
             lerpColorCalc(Color.alpha(colorStart), Color.alpha(colorEnd), perc),
             lerpColorCalc(Color.red(colorStart), Color.red(colorEnd), perc),
             lerpColorCalc(Color.green(colorStart), Color.green(colorEnd), perc),
-            lerpColorCalc(Color.blue(colorStart), Color.blue(colorEnd), perc)
+            lerpColorCalc(Color.blue(colorStart), Color.blue(colorEnd), perc),
         )
     }
 
@@ -235,7 +286,7 @@ class ReaderChapterSheet @JvmOverloads constructor(context: Context, attrs: Attr
         return (
             min(colorStart, colorEnd) * (100 - percent) + max(
                 colorStart,
-                colorEnd
+                colorEnd,
             ) * percent
             ) / 100
     }

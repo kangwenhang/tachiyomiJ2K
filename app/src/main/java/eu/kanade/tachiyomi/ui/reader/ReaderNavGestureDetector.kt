@@ -11,22 +11,26 @@ class ReaderNavGestureDetector(private val activity: ReaderActivity) : GestureDe
 
     var hasScrollHorizontal = false
     var lockVertical = false
+    private var startingX = 0f
+    private var startingY = 0f
 
     override fun onDown(e: MotionEvent): Boolean {
         lockVertical = false
         hasScrollHorizontal = false
+        startingX = e.x
+        startingY = e.y
         return false
     }
 
     override fun onScroll(
         e1: MotionEvent?,
-        e2: MotionEvent?,
+        e2: MotionEvent,
         distanceX: Float,
-        distanceY: Float
+        distanceY: Float,
     ): Boolean {
-        val newDistanceX = (e1?.rawX ?: 0f) - (e2?.rawX ?: 0f)
-        val newDistanceY = (e1?.rawY ?: 0f) - (e2?.rawY ?: 0f)
-        if ((!hasScrollHorizontal || lockVertical) && e2 != null) {
+        val newDistanceX = startingX - e2.x
+        val newDistanceY = startingY - e2.y
+        if ((!hasScrollHorizontal || lockVertical)) {
             hasScrollHorizontal = abs(newDistanceX) > abs(newDistanceY) && abs(newDistanceX) > 40
             if (!lockVertical) {
                 lockVertical = abs(newDistanceX) < abs(newDistanceY) && abs(newDistanceY) > 150
@@ -36,14 +40,14 @@ class ReaderNavGestureDetector(private val activity: ReaderActivity) : GestureDe
     }
 
     override fun onFling(
-        e1: MotionEvent,
+        e1: MotionEvent?,
         e2: MotionEvent,
         velocityX: Float,
-        velocityY: Float
+        velocityY: Float,
     ): Boolean {
         var result = false
-        val diffY = e2.y - e1.y
-        val diffX = e2.x - e1.x
+        val diffY = e2.y - startingY
+        val diffX = e2.x - startingX
         val sheetBehavior = activity.binding.chaptersSheet.root.sheetBehavior
         if (!hasScrollHorizontal && abs(diffX) < abs(diffY) &&
             (abs(diffY) > SWIPE_THRESHOLD || abs(velocityY) > SWIPE_VELOCITY_THRESHOLD) &&

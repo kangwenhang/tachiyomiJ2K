@@ -10,6 +10,7 @@ import android.graphics.drawable.Icon
 import coil.Coil
 import coil.request.ImageRequest
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.appwidget.TachiyomiWidgetManager
 import eu.kanade.tachiyomi.data.cache.CoverCache
 import eu.kanade.tachiyomi.data.database.DatabaseHelper
 import eu.kanade.tachiyomi.data.database.models.Manga
@@ -22,7 +23,6 @@ import eu.kanade.tachiyomi.ui.main.SearchActivity
 import eu.kanade.tachiyomi.ui.recents.RecentsPresenter
 import eu.kanade.tachiyomi.ui.source.browse.BrowseSourceController
 import eu.kanade.tachiyomi.util.system.launchIO
-import kotlinx.coroutines.GlobalScope
 import timber.log.Timber
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -32,18 +32,18 @@ class MangaShortcutManager(
     val preferences: PreferencesHelper = Injekt.get(),
     val db: DatabaseHelper = Injekt.get(),
     val coverCache: CoverCache = Injekt.get(),
-    val sourceManager: SourceManager = Injekt.get()
+    val sourceManager: SourceManager = Injekt.get(),
 ) {
 
-    val context: Context = preferences.context
-    fun updateShortcuts() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N_MR1) {
-            if (!preferences.showSeriesInShortcuts() && !preferences.showSourcesInShortcuts()) {
-                val shortcutManager = context.getSystemService(ShortcutManager::class.java)
-                shortcutManager.removeAllDynamicShortcuts()
-                return
-            }
-            GlobalScope.launchIO {
+    fun updateShortcuts(context: Context) {
+        launchIO {
+            with(TachiyomiWidgetManager()) { context.init() }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N_MR1) {
+                if (!preferences.showSeriesInShortcuts() && !preferences.showSourcesInShortcuts()) {
+                    val shortcutManager = context.getSystemService(ShortcutManager::class.java)
+                    shortcutManager.removeAllDynamicShortcuts()
+                    return@launchIO
+                }
                 val shortcutManager = context.getSystemService(ShortcutManager::class.java)
 
                 val recentManga = if (preferences.showSeriesInShortcuts()) {
@@ -78,21 +78,29 @@ class MangaShortcutManager(
 
                             ShortcutInfo.Builder(
                                 context,
-                                "Manga-${item.id?.toString() ?: item.title}"
+                                "Manga-${item.id?.toString() ?: item.title}",
                             )
-                                .setShortLabel(item.title.takeUnless { it.isBlank() } ?: context.getString(R.string.manga))
-                                .setLongLabel(item.title.takeUnless { it.isBlank() } ?: context.getString(R.string.manga))
+                                .setShortLabel(
+                                    item.title.takeUnless { it.isBlank() }
+                                        ?: context.getString(R.string.manga),
+                                )
+                                .setLongLabel(
+                                    item.title.takeUnless { it.isBlank() }
+                                        ?: context.getString(R.string.manga),
+                                )
                                 .setIcon(
                                     if (bitmap != null) if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                                         Icon.createWithAdaptiveBitmap(bitmap.toSquare())
                                     } else {
                                         Icon.createWithBitmap(bitmap)
                                     }
-                                    else Icon.createWithResource(context, R.drawable.ic_book_24dp)
+                                    else {
+                                        Icon.createWithResource(context, R.drawable.ic_book_24dp)
+                                    },
                                 )
                                 .setIntent(
                                     SearchActivity.openMangaIntent(context, item.id, true)
-                                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
                                 )
                                 .build()
                         }
@@ -111,17 +119,17 @@ class MangaShortcutManager(
                                     else {
                                         Icon.createWithResource(
                                             context,
-                                            R.drawable.sc_extensions_48dp
+                                            R.drawable.sc_extensions_48dp,
                                         )
-                                    }
+                                    },
                                 )
                                 .setIntent(
                                     Intent(
                                         context,
-                                        SearchActivity::class.java
+                                        SearchActivity::class.java,
                                     ).setAction(MainActivity.SHORTCUT_SOURCE)
                                         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                                        .putExtra(BrowseSourceController.SOURCE_ID_KEY, item.id)
+                                        .putExtra(BrowseSourceController.SOURCE_ID_KEY, item.id),
                                 )
                                 .build()
                         }

@@ -10,14 +10,16 @@ import eu.kanade.tachiyomi.data.track.TrackService
 
 interface TrackQueries : DbProvider {
 
-    fun getTracks(manga: Manga) = db.get()
+    fun getTracks(manga: Manga) = getTracks(manga.id)
+
+    fun getTracks(mangaId: Long?) = db.get()
         .listOfObjects(Track::class.java)
         .withQuery(
             Query.builder()
                 .table(TrackTable.TABLE)
                 .where("${TrackTable.COL_MANGA_ID} = ?")
-                .whereArgs(manga.id)
-                .build()
+                .whereArgs(mangaId)
+                .build(),
         )
         .prepare()
 
@@ -31,7 +33,7 @@ interface TrackQueries : DbProvider {
                 .table(TrackTable.TABLE)
                 .where("${TrackTable.COL_MANGA_ID} = ? AND ${TrackTable.COL_SYNC_ID} = ?")
                 .whereArgs(manga.id, sync.id)
-                .build()
+                .build(),
         )
         .prepare()
 }

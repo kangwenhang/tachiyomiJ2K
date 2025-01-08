@@ -2,8 +2,11 @@ package eu.kanade.tachiyomi.ui.security
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
+import android.view.Window
 import android.view.WindowManager
 import androidx.biometric.BiometricManager
+import eu.kanade.tachiyomi.data.preference.PreferenceValues
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.ui.main.SearchActivity
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil
@@ -16,15 +19,21 @@ object SecureActivityDelegate {
 
     var locked: Boolean = true
 
-    fun setSecure(activity: Activity?, force: Boolean? = null) {
-        val enabled = force ?: preferences.secureScreen().get()
+    fun setSecure(activity: Activity?) {
+        val incognitoMode = preferences.incognitoMode().get()
+        val enabled = when (preferences.secureScreen().get()) {
+            PreferenceValues.SecureScreenMode.ALWAYS -> true
+            PreferenceValues.SecureScreenMode.INCOGNITO -> incognitoMode
+            else -> false
+        }
+        activity?.window?.setSecureScreen(enabled)
+    }
+
+    private fun Window.setSecureScreen(enabled: Boolean) {
         if (enabled) {
-            activity?.window?.setFlags(
-                WindowManager.LayoutParams.FLAG_SECURE,
-                WindowManager.LayoutParams.FLAG_SECURE
-            )
+            setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         } else {
-            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
 
@@ -36,7 +45,11 @@ object SecureActivityDelegate {
                 val intent = Intent(activity, BiometricActivity::class.java)
                 intent.putExtra("fromSearch", (activity is SearchActivity) && !requireSuccess)
                 activity.startActivity(intent)
-                activity.overridePendingTransition(0, 0)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
+                } else {
+                    activity.overridePendingTransition(0, 0)
+                }
             }
         } else if (lockApp) {
             preferences.useBiometrics().set(false)

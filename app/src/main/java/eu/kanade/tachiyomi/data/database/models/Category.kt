@@ -28,6 +28,8 @@ interface Category : Serializable {
 
     var sourceId: Long?
 
+    var langId: String?
+
     fun isAscending(): Boolean {
         return ((mangaSort?.minus('a') ?: 0) % 2) != 1
     }
@@ -50,6 +52,8 @@ interface Category : Serializable {
     }
 
     companion object {
+        var lastCategoriesAddedTo = emptySet<Int>()
+
         fun create(name: String): Category = CategoryImpl().apply {
             this.name = name
         }

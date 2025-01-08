@@ -13,36 +13,37 @@ import kotlin.math.sign
 
 class LibraryGestureDetector(private val controller: LibraryController) : GestureDetector
 .SimpleOnGestureListener() {
+
+    private var startingX = 0f
+    private var startingY = 0f
     override fun onDown(e: MotionEvent): Boolean {
+        startingX = e.x
+        startingY = e.y
         return false
     }
 
     override fun onScroll(
         e1: MotionEvent?,
-        e2: MotionEvent?,
+        e2: MotionEvent,
         distanceX: Float,
-        distanceY: Float
+        distanceY: Float,
     ): Boolean {
-        val distance = ((e1?.rawX ?: 0f) - (e2?.rawX ?: 0f)) / 50
+        val distance = (startingX - e2.x) / 50
         val poa = 1.7f
         controller.binding.categoryHopperFrame.translationX = abs(distance).pow(poa) * -sign(distance)
         return super.onScroll(e1, e2, distanceX, distanceY)
     }
 
-    override fun onSingleTapUp(e: MotionEvent?): Boolean {
-        return super.onSingleTapUp(e)
-    }
-
     @SuppressLint("RtlHardcoded")
     override fun onFling(
-        e1: MotionEvent,
+        e1: MotionEvent?,
         e2: MotionEvent,
         velocityX: Float,
-        velocityY: Float
+        velocityY: Float,
     ): Boolean {
         var result = false
-        val diffY = e2.y - e1.y
-        val diffX = e2.x - e1.x
+        val diffY = e2.y - startingY
+        val diffX = e2.x - startingX
         val hopperFrame = controller.binding.categoryHopperFrame
         val animator = controller.binding.categoryHopperFrame.animate().setDuration(150L)
         animator.translationX(0f)
@@ -60,13 +61,17 @@ class LibraryGestureDetector(private val controller: LibraryController) : Gestur
             }
         } else if (abs(diffX) >= abs(diffY) &&
             abs(diffX) > SWIPE_THRESHOLD * 5 &&
-            abs(velocityX) > SWIPE_VELOCITY_THRESHOLD
+            abs(velocityX) > SWIPE_VELOCITY_THRESHOLD &&
+            sign(diffX) == sign(velocityX)
         ) {
             val hopperGravity = (controller.binding.categoryHopperFrame.layoutParams as CoordinatorLayout.LayoutParams).gravity
             if (diffX <= 0) {
                 animator.translationX(
-                    if (hopperGravity == Gravity.TOP or Gravity.LEFT) 0f
-                    else (-(controller.view!!.width - controller.binding.categoryHopperFrame.width) / 2).toFloat()
+                    if (hopperGravity == Gravity.TOP or Gravity.LEFT) {
+                        0f
+                    } else {
+                        (-(controller.view!!.width - controller.binding.categoryHopperFrame.width) / 2).toFloat()
+                    },
                 ).withEndAction {
                     hopperFrame.updateLayoutParams<CoordinatorLayout.LayoutParams> {
                         gravity =
@@ -84,8 +89,11 @@ class LibraryGestureDetector(private val controller: LibraryController) : Gestur
                 }
             } else {
                 animator.translationX(
-                    if (hopperGravity == Gravity.TOP or Gravity.RIGHT) 0f
-                    else ((controller.view!!.width - hopperFrame.width) / 2).toFloat()
+                    if (hopperGravity == Gravity.TOP or Gravity.RIGHT) {
+                        0f
+                    } else {
+                        ((controller.view!!.width - hopperFrame.width) / 2).toFloat()
+                    },
                 ).withEndAction {
                     hopperFrame.updateLayoutParams<CoordinatorLayout.LayoutParams> {
                         gravity =

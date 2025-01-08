@@ -4,12 +4,13 @@ import android.view.View
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import coil.Coil
-import coil.clear
+import coil.dispose
 import coil.request.ImageRequest
 import eu.davidea.flexibleadapter.FlexibleAdapter
 import eu.davidea.flexibleadapter.items.IFlexible
 import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.data.image.coil.CoverViewTarget
+import eu.kanade.tachiyomi.data.image.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.databinding.MangaListItemBinding
 import eu.kanade.tachiyomi.util.view.setCards
 
@@ -24,7 +25,7 @@ import eu.kanade.tachiyomi.util.view.setCards
 class BrowseSourceListHolder(
     private val view: View,
     adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>,
-    showOutline: Boolean
+    showOutline: Boolean,
 ) :
     BrowseSourceHolder(view, adapter) {
 
@@ -50,12 +51,16 @@ class BrowseSourceListHolder(
     override fun setImage(manga: Manga) {
         // Update the cover.
         if (manga.thumbnail_url == null) {
-            binding.coverThumbnail.clear()
+            binding.coverThumbnail.dispose()
         } else {
             manga.id ?: return
             val request = ImageRequest.Builder(view.context).data(manga)
-                .target(CoverViewTarget(binding.coverThumbnail)).build()
+                .target(CoverViewTarget(binding.coverThumbnail))
+                .setParameter(MangaCoverFetcher.useCustomCover, false)
+                .build()
             Coil.imageLoader(view.context).enqueue(request)
+
+            binding.coverThumbnail.alpha = if (manga.favorite) 0.34f else 1.0f
         }
     }
 }

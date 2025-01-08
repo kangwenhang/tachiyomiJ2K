@@ -8,20 +8,23 @@ import androidx.appcompat.widget.SearchView
 import androidx.preference.CheckBoxPreference
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceScreen
-import com.jakewharton.rxbinding.support.v7.widget.queryTextChanges
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.preference.minusAssign
 import eu.kanade.tachiyomi.data.preference.plusAssign
 import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.source.icon
 import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.ui.main.FloatingSearchInterface
+import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.util.system.LocaleHelper
+import eu.kanade.tachiyomi.util.view.activityBinding
+import eu.kanade.tachiyomi.util.view.setOnQueryTextChangeListener
 import eu.kanade.tachiyomi.widget.preference.SwitchPreferenceCategory
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.TreeMap
 
-class SettingsSourcesController : SettingsController() {
+class SettingsSourcesController : SettingsController(), FloatingSearchInterface {
     init {
         setHasOptionsMenu(true)
     }
@@ -35,6 +38,10 @@ class SettingsSourcesController : SettingsController() {
     private var sourcesByLang: TreeMap<String, MutableList<HttpSource>> = TreeMap()
     private var sorting = SourcesSort.Alpha
 
+    override fun getSearchTitle(): String? {
+        return view?.context?.getString(R.string.search)
+    }
+
     override fun setupPreferenceScreen(screen: PreferenceScreen) = screen.apply {
         titleRes = R.string.filter
         sorting = SourcesSort.from(preferences.sourceSorting().get()) ?: SourcesSort.Alpha
@@ -43,7 +50,7 @@ class SettingsSourcesController : SettingsController() {
         val activeLangsCodes = preferences.enabledLanguages().get()
 
         // Get a map of sources grouped by language.
-        sourcesByLang = onlineSources.groupByTo(TreeMap(), { it.lang })
+        sourcesByLang = onlineSources.groupByTo(TreeMap()) { it.lang }
 
         // Order first by active languages, then inactive ones
         orderedLangs = sourcesByLang.keys.filter { it in activeLangsCodes } + sourcesByLang.keys
@@ -74,8 +81,8 @@ class SettingsSourcesController : SettingsController() {
                             }
                             true
                         }
-                    }
-                )
+                    },
+                ),
             )
         }
     }
@@ -134,8 +141,11 @@ class SettingsSourcesController : SettingsController() {
                     val current = preferences.hiddenSources().get()
 
                     preferences.hiddenSources().set(
-                        if (checked) current - id
-                        else current + id
+                        if (checked) {
+                            current - id
+                        } else {
+                            current + id
+                        },
                     )
 
                     group.removeAll()
@@ -160,28 +170,54 @@ class SettingsSourcesController : SettingsController() {
      */
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         inflater.inflate(R.menu.settings_sources, menu)
-        if (sorting == SourcesSort.Alpha) menu.findItem(R.id.action_sort_alpha).isChecked = true
-        else menu.findItem(R.id.action_sort_enabled).isChecked = true
-
-        val searchItem = menu.findItem(R.id.action_search)
-        val searchView = searchItem.actionView as SearchView
-        searchView.maxWidth = Int.MAX_VALUE
-
-        if (query.isNotEmpty()) {
-            searchItem.expandActionView()
-            searchView.setQuery(query, true)
-            searchView.clearFocus()
+        if (sorting == SourcesSort.Alpha) {
+            menu.findItem(R.id.action_sort_alpha).isChecked = true
+        } else {
+            menu.findItem(R.id.action_sort_enabled).isChecked = true
         }
 
-        searchView.queryTextChanges().filter { router.backstack.lastOrNull()?.controller == this }
-            .subscribeUntilDestroy {
-                query = it.toString()
-                drawSources()
-            }
+        val useSearchTB = showFloatingBar()
+        val searchItem = if (useSearchTB) {
+            activityBinding?.searchToolbar?.searchItem
+        } else {
+            (menu.findItem(R.id.action_search))
+        }
+        val searchView = if (useSearchTB) {
+            activityBinding?.searchToolbar?.searchView
+        } else {
+            searchItem?.actionView as? SearchView
+        }
+        if (!useSearchTB) {
+            searchView?.maxWidth = Int.MAX_VALUE
+        }
 
-        // Fixes problem with the overflow icon showing up in lieu of search
-        searchItem.fixExpand(onExpand = { invalidateMenuOnExpand() })
+        activityBinding?.searchToolbar?.setQueryHint(getSearchTitle(), query.isEmpty())
+
+        if (query.isNotEmpty()) {
+            searchItem?.expandActionView()
+            searchView?.setQuery(query, true)
+            searchView?.clearFocus()
+        }
+
+        setOnQueryTextChangeListener(activityBinding?.searchToolbar?.searchView) {
+            query = it ?: ""
+            drawSources()
+            true
+        }
+
+        setOnQueryTextChangeListener(searchView) {
+            query = it ?: ""
+            drawSources()
+            true
+        }
+
+        if (useSearchTB) {
+            // Fixes problem with the overflow icon showing up in lieu of search
+            searchItem?.fixExpand(onExpand = { invalidateMenuOnExpand() })
+        }
     }
+
+    override fun showFloatingBar() = activityBinding?.appBar?.useLargeToolbar == true
 
     var expandActionViewFromInteraction = false
     private fun MenuItem.fixExpand(onExpand: ((MenuItem) -> Boolean)? = null, onCollapse: ((MenuItem) -> Boolean)? = null) {
@@ -196,7 +232,7 @@ class SettingsSourcesController : SettingsController() {
 
                     return onCollapse?.invoke(item) ?: true
                 }
-            }
+            },
         )
 
         if (expandActionViewFromInteraction) {
@@ -248,6 +284,14 @@ class SettingsSourcesController : SettingsController() {
             else -> return super.onOptionsItemSelected(item)
         }
         item.isChecked = true
+        (activity as? MainActivity)?.let {
+            val otherTB = if (it.currentToolbar == it.binding.searchToolbar) {
+                it.binding.toolbar
+            } else {
+                it.binding.searchToolbar
+            }
+            otherTB.menu.findItem(item.itemId).isChecked = true
+        }
         preferences.sourceSorting().set(sorting.value)
         drawSources()
         return true
@@ -257,7 +301,7 @@ class SettingsSourcesController : SettingsController() {
         Alpha(0), Enabled(1);
 
         companion object {
-            fun from(i: Int): SourcesSort? = values().find { it.value == i }
+            fun from(i: Int): SourcesSort? = entries.find { it.value == i }
         }
     }
 }

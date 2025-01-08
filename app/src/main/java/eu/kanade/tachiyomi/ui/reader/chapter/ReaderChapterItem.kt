@@ -11,16 +11,12 @@ import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.ReaderChapterItemBinding
 import eu.kanade.tachiyomi.util.chapter.ChapterUtil
+import eu.kanade.tachiyomi.util.chapter.ChapterUtil.Companion.preferredChapterName
 import uy.kohesive.injekt.injectLazy
-import java.text.DecimalFormat
-import java.text.DecimalFormatSymbols
 
 class ReaderChapterItem(val chapter: Chapter, val manga: Manga, val isCurrent: Boolean) :
     AbstractItem<ReaderChapterItem.ViewHolder>(),
     Chapter by chapter {
-
-    val decimalFormat =
-        DecimalFormat("#.###", DecimalFormatSymbols().apply { decimalSeparator = '.' })
 
     val preferences: PreferencesHelper by injectLazy()
 
@@ -44,10 +40,8 @@ class ReaderChapterItem(val chapter: Chapter, val manga: Manga, val isCurrent: B
 
             val chapterColor = ChapterUtil.chapterColor(itemView.context, item.chapter)
 
-            binding.chapterTitle.text = if (manga.hideChapterTitle(item.preferences)) {
-                val number = item.decimalFormat.format(item.chapter_number.toDouble())
-                itemView.context.getString(R.string.chapter_, number)
-            } else item.name
+            binding.chapterTitle.text =
+                item.preferredChapterName(itemView.context, manga, item.preferences)
 
             val statuses = mutableListOf<String>()
             ChapterUtil.relativeDate(item)?.let { statuses.add(it) }
@@ -66,8 +60,11 @@ class ReaderChapterItem(val chapter: Chapter, val manga: Manga, val isCurrent: B
             binding.chapterSubtitle.setTextColor(chapterColor)
 
             binding.bookmarkImage.setImageResource(
-                if (item.bookmark) R.drawable.ic_bookmark_24dp
-                else R.drawable.ic_bookmark_border_24dp
+                if (item.bookmark) {
+                    R.drawable.ic_bookmark_24dp
+                } else {
+                    R.drawable.ic_bookmark_border_24dp
+                },
             )
 
             val drawableColor = ChapterUtil.bookmarkColor(itemView.context, item)

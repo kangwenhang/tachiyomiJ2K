@@ -21,7 +21,6 @@
     <string name="alphabetically">Pa-alpabeto</string>
     <string name="total_chapters">Kabuuan</string>
     <string name="last_read">Huling nabasa</string>
-    <string name="last_updated">Huling na-update</string>
     <string name="search">Maghanap</string>
     <string name="select_all">Piliin lahat</string>
     <string name="mark_as_read">Markahang nabasa</string>
@@ -77,8 +76,6 @@
     <string name="library_update_restriction_summary">I-update lamang kung nakamit ang mga kondisyon</string>
     <string name="wifi">Wi-Fi</string>
     <string name="charging">Habang nagtsa-charge</string>
-    <string name="only_update_ongoing">I-update lamang ang (mga) nagpapatuloy na manga</string>
-    <string name="sync_chapters_after_reading">I-sync ang mga kabanata pagkatapos basahin</string>
     <string name="app_theme">Tema ng application</string>
     <string name="dark">Madilim na tema</string>
     <string name="amoled_black">Temang AMOLED</string>
@@ -112,7 +109,6 @@
     <string name="navigation">Pangangalugad</string>
     <string name="volume_keys">Mga buton sa volume</string>
     <string name="invert_volume_keys">Baligtarin ang buton sa volume</string>
-    <string name="tapping">Pag-pindot</string>
     <string name="background_color">Kulay ng likuran</string>
     <string name="white">Puti</string>
     <string name="black">Itim</string>
@@ -172,7 +168,6 @@
     <string name="dodge_lighten">Iwas / Liwanag (Dodge / Lighten)</string>
     <string name="burn_darken">Sunog / Dilim (Burn / Darken)</string>
     <string name="help">Tulong</string>
-    <string name="library_update_order">Ayos ng pag-update ng Aklatan</string>
     <string name="what_should_backup">Ano ang gusto mong i-backup\?</string>
     <string name="restoring_backup">Nire-restore ang backup</string>
     <string name="clear_chapter_cache">Linisin ang cache ng kabanata</string>
@@ -221,7 +216,6 @@
     <string name="downloading">Dina-download</string>
     <string name="downloading_progress">Dina-download (%1$d/%2$d)</string>
     <string name="paused">Naka-tigil</string>
-    <string name="next_5_unread">I-download ang susunod na 5 kabanata</string>
     <string name="custom_range">Mag-download ng custom</string>
     <string name="all_chapters">I-download lahat</string>
     <string name="all_unread_chapters">I-download ang hindi na nababasa</string>
@@ -235,9 +229,7 @@
     <string name="title">Pamagat</string>
     <string name="started">Nagsimula</string>
     <string name="type">Uri</string>
-    <string name="url_not_set_click_again">Hindi na-set ang URL ng manga. Mangyaring pindutin ang pamagat at pumili ng manga muli.</string>
     <string name="category_with_name_exists">Mayroon nang kategoryang kasing-pangalan nito!</string>
-    <string name="this_will_remove_the_read_date_question">Tatanggalin nito ang petsa ng pagbasa ng kabanatang ito. Sigurado ka ba\?</string>
     <string name="picture_saved">Na-save ang larawan</string>
     <string name="options">Mga Pagpipilian</string>
     <string name="set_as_cover">I-set bilang pabalat</string>
@@ -322,4 +314,5 @@
     <string name="label_global_search">Pangkalahatang Paghahanap</string>
     <string name="name">Pangalan</string>
     <string name="all_files_permission_required">Kailangan ng pahintulot sa file</string>
+    <string name="tako">Tako</string>
 </resources>

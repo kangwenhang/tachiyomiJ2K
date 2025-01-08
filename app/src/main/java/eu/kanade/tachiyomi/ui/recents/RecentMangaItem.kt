@@ -9,27 +9,37 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.Chapter
 import eu.kanade.tachiyomi.data.database.models.ChapterImpl
 import eu.kanade.tachiyomi.data.database.models.MangaChapterHistory
+import eu.kanade.tachiyomi.data.download.model.Download
+import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.ui.manga.chapter.BaseChapterHolder
 import eu.kanade.tachiyomi.ui.manga.chapter.BaseChapterItem
 
 class RecentMangaItem(
     val mch: MangaChapterHistory = MangaChapterHistory.createBlank(),
     chapter: Chapter = ChapterImpl(),
-    header: AbstractHeaderItem<*>?
+    header: AbstractHeaderItem<*>?,
 ) :
     BaseChapterItem<BaseChapterHolder, AbstractHeaderItem<*>>(chapter, header) {
 
+    var downloadInfo = listOf<DownloadInfo>()
+
     override fun getLayoutRes(): Int {
-        return if (mch.manga.id == null) R.layout.recents_footer_item
-        else R.layout.recent_manga_item
+        return if (mch.manga.id == null) {
+            R.layout.recents_footer_item
+        } else {
+            R.layout.recent_manga_item
+        }
     }
 
     override fun createViewHolder(
         view: View,
-        adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>
+        adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>,
     ): BaseChapterHolder {
-        return if (mch.manga.id == null) RecentMangaFooterHolder(view, adapter as RecentMangaAdapter)
-        else RecentMangaHolder(view, adapter as RecentMangaAdapter)
+        return if (mch.manga.id == null) {
+            RecentMangaFooterHolder(view, adapter as RecentMangaAdapter)
+        } else {
+            RecentMangaHolder(view, adapter as RecentMangaAdapter)
+        }
     }
 
     override fun isSwipeable(): Boolean {
@@ -39,25 +49,53 @@ class RecentMangaItem(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other is RecentMangaItem) {
-            return if (mch.manga.id == null) (header as? RecentMangaHeaderItem)?.recentsType ==
-                (other.header as? RecentMangaHeaderItem)?.recentsType
-            else chapter.id == other.chapter.id
+            return if (mch.manga.id == null) {
+                (header as? RecentMangaHeaderItem)?.recentsType ==
+                    (other.header as? RecentMangaHeaderItem)?.recentsType
+            } else {
+                chapter.id == other.chapter.id
+            }
         }
         return false
     }
 
     override fun hashCode(): Int {
-        return if (mch.manga.id == null) -((header as? RecentMangaHeaderItem)?.recentsType ?: 0).hashCode()
-        else (chapter.id ?: 0L).hashCode()
+        return if (mch.manga.id == null) {
+            -((header as? RecentMangaHeaderItem)?.recentsType ?: 0).hashCode()
+        } else {
+            (chapter.id ?: 0L).hashCode()
+        }
     }
 
     override fun bindViewHolder(
         adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>,
         holder: BaseChapterHolder,
         position: Int,
-        payloads: MutableList<Any?>?
+        payloads: MutableList<Any?>?,
     ) {
-        if (mch.manga.id == null) (holder as? RecentMangaFooterHolder)?.bind((header as? RecentMangaHeaderItem)?.recentsType ?: 0)
-        else if (chapter.id != null) (holder as? RecentMangaHolder)?.bind(this)
+        if (mch.manga.id == null) {
+            (holder as? RecentMangaFooterHolder)?.bind((header as? RecentMangaHeaderItem)?.recentsType ?: 0)
+        } else if (chapter.id != null) (holder as? RecentMangaHolder)?.bind(this)
+    }
+
+    class DownloadInfo {
+        private var _status: Download.State = Download.State.default
+
+        var chapterId: Long? = 0L
+
+        val progress: Int
+            get() {
+                val pages = download?.pages ?: return 0
+                return pages.map(Page::progress).average().toInt()
+            }
+
+        var status: Download.State
+            get() = download?.status ?: _status
+            set(value) { _status = value }
+
+        @Transient var download: Download? = null
+
+        val isDownloaded: Boolean
+            get() = status == Download.State.DOWNLOADED
     }
 }

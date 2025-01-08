@@ -11,7 +11,7 @@ enum class LibrarySort(
     @DrawableRes private val iconRes: Int,
     private val catValue: Int = mainValue,
     @StringRes private val dynamicStringRes: Int = stringRes,
-    @DrawableRes private val dynamicIconRes: Int = iconRes
+    @DrawableRes private val dynamicIconRes: Int = iconRes,
 ) {
 
     Title(0, R.string.title, R.drawable.ic_sort_by_alpha_24dp),
@@ -27,8 +27,9 @@ enum class LibrarySort(
         R.drawable.ic_swap_vert_24dp,
         7,
         R.string.category,
-        R.drawable.ic_label_outline_24dp
-    )
+        R.drawable.ic_label_outline_24dp,
+    ),
+
     ;
 
     val categoryValue: Char
@@ -36,6 +37,19 @@ enum class LibrarySort(
 
     val categoryValueDescending: Char
         get() = if (this == DragAndDrop) 'D' else 'b' + catValue * 2
+
+    fun serialize(): String {
+        val type = when (this) {
+            LastRead -> "LAST_READ"
+            Unread -> "UNREAD_COUNT"
+            TotalChapters -> "TOTAL_CHAPTERS"
+            LatestChapter -> "LATEST_CHAPTER"
+            DateFetched -> "CHAPTER_FETCH_DATE"
+            DateAdded -> "DATE_ADDED"
+            else -> "ALPHABETICAL"
+        }
+        return "$type,ASCENDING"
+    }
 
     @StringRes
     fun stringRes(isDynamic: Boolean) = if (isDynamic) dynamicStringRes else stringRes
@@ -50,12 +64,32 @@ enum class LibrarySort(
         return MaterialMenuSheet.MenuSheetItem(
             mainValue,
             iconRes(isDynamic),
-            stringRes(isDynamic)
+            stringRes(isDynamic),
         )
     }
 
     companion object {
-        fun valueOf(value: Int) = values().find { it.mainValue == value }
-        fun valueOf(char: Char?) = values().find { it.categoryValue == char || it.categoryValueDescending == char }
+        fun deserialize(serialized: String): LibrarySort {
+            if (serialized.isEmpty()) return Title
+            return try {
+                val values = serialized.split(",")
+                when (values[0]) {
+                    "ALPHABETICAL" -> Title
+                    "LAST_READ" -> LastRead
+                    "LAST_MANGA_UPDATE" -> LatestChapter
+                    "UNREAD_COUNT" -> Unread
+                    "TOTAL_CHAPTERS" -> TotalChapters
+                    "LATEST_CHAPTER" -> LatestChapter
+                    "CHAPTER_FETCH_DATE" -> DateFetched
+                    "DATE_ADDED" -> DateAdded
+                    else -> Title
+                }
+            } catch (e: Exception) {
+                Title
+            }
+        }
+
+        fun valueOf(value: Int) = entries.find { it.mainValue == value }
+        fun valueOf(char: Char?) = entries.find { it.categoryValue == char || it.categoryValueDescending == char }
     }
 }

@@ -2,30 +2,33 @@ package eu.kanade.tachiyomi.ui.setting
 
 import android.app.Activity
 import androidx.annotation.StringRes
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.biometric.BiometricPrompt
-import androidx.core.graphics.drawable.DrawableCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.preference.CheckBoxPreference
 import androidx.preference.DialogPreference
 import androidx.preference.DropDownPreference
 import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
-import androidx.vectordrawable.graphics.drawable.VectorDrawableCompat
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil.isAuthenticationSupported
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil.startAuthentication
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.toast
+import eu.kanade.tachiyomi.widget.preference.AdaptiveTitlePreferenceCategory
+import eu.kanade.tachiyomi.widget.preference.EditTextResetPreference
 import eu.kanade.tachiyomi.widget.preference.IntListMatPreference
 import eu.kanade.tachiyomi.widget.preference.ListMatPreference
 import eu.kanade.tachiyomi.widget.preference.MultiListMatPreference
 import eu.kanade.tachiyomi.widget.preference.TriStateListPreference
+import com.fredporciuncula.flow.preferences.Preference as FlowPreference
 
 @DslMarker
 @Target(AnnotationTarget.TYPE)
@@ -51,64 +54,45 @@ inline fun PreferenceGroup.checkBoxPreference(block: (@DSL CheckBoxPreference).(
     return initThenAdd(CheckBoxPreference(context), block)
 }
 
-inline fun PreferenceGroup.editTextPreference(block: (@DSL EditTextPreference).() -> Unit): EditTextPreference {
-    return initThenAdd(EditTextPreference(context), block).also(::initDialog)
+inline fun PreferenceGroup.editTextPreference(activity: Activity?, block: (@DSL EditTextResetPreference).() -> Unit): EditTextResetPreference {
+    return initThenAdd(EditTextResetPreference(activity, context), block) // .also(::initDialog)
 }
 
-inline fun PreferenceGroup.dropDownPreference(block: (@DSL DropDownPreference).() -> Unit):
-    DropDownPreference {
+inline fun PreferenceGroup.dropDownPreference(block: (@DSL DropDownPreference).() -> Unit): DropDownPreference {
     return initThenAdd(DropDownPreference(context), block).also(::initDialog)
 }
 
 inline fun PreferenceGroup.listPreference(
     activity: Activity?,
     block: (@DSL ListMatPreference).()
-    -> Unit
-):
-    ListMatPreference {
+    -> Unit,
+): ListMatPreference {
     return initThenAdd(ListMatPreference(activity, context), block)
 }
 
 inline fun PreferenceGroup.intListPreference(
     activity: Activity?,
-    block: (
-        @DSL
-        IntListMatPreference
-    ).() -> Unit
-):
-    IntListMatPreference {
+    block: (@DSL IntListMatPreference).() -> Unit,
+): IntListMatPreference {
     return initThenAdd(IntListMatPreference(activity, context), block)
 }
 
 inline fun PreferenceGroup.multiSelectListPreferenceMat(
     activity: Activity?,
-    block: (
-        @DSL
-        MultiListMatPreference
-    ).()
-    -> Unit
+    block: (@DSL MultiListMatPreference).() -> Unit,
 ): MultiListMatPreference {
     return initThenAdd(MultiListMatPreference(activity, context), block)
 }
 
 inline fun PreferenceGroup.triStateListPreference(
     activity: Activity?,
-    block: (
-        @DSL
-        TriStateListPreference
-    ).()
-    -> Unit
+    block: (@DSL TriStateListPreference).() -> Unit,
 ): TriStateListPreference {
     return initThenAdd(TriStateListPreference(activity, context), block)
 }
 
 inline fun PreferenceScreen.preferenceCategory(block: (@DSL PreferenceCategory).() -> Unit): PreferenceCategory {
-    return addThenInit(
-        PreferenceCategory(context).apply {
-            isIconSpaceReserved = false
-        },
-        block
-    )
+    return addThenInit(AdaptiveTitlePreferenceCategory(context), block)
 }
 
 inline fun PreferenceScreen.switchPreference(block: (@DSL SwitchPreferenceCompat).() -> Unit): SwitchPreferenceCompat {
@@ -117,7 +101,7 @@ inline fun PreferenceScreen.switchPreference(block: (@DSL SwitchPreferenceCompat
 
 fun PreferenceGroup.infoPreference(@StringRes infoRes: Int): Preference {
     return initThenAdd(
-        Preference(context)
+        Preference(context),
     ) {
         iconRes = R.drawable.ic_info_outline_24dp
         iconTint = context.getResourceColor(android.R.attr.textColorSecondary)
@@ -138,7 +122,7 @@ fun initDialog(dialogPreference: DialogPreference) {
     }
 }
 
-inline fun <P : Preference> PreferenceGroup.add(p: P): P {
+fun <P : Preference> PreferenceGroup.add(p: P): P {
     return p.apply {
         this.isIconSpaceReserved = false
         this.isSingleLineTitle = false
@@ -172,17 +156,61 @@ inline fun Preference.onChange(crossinline block: (Any?) -> Boolean) {
     setOnPreferenceChangeListener { _, newValue -> block(newValue) }
 }
 
+fun <T> Preference.bindTo(preference: FlowPreference<T>) {
+    key = preference.key
+    defaultValue = preference.defaultValue
+}
+
+fun <T> ListPreference.bindTo(preference: FlowPreference<T>) {
+    key = preference.key
+    defaultValue = preference.defaultValue.toString()
+}
+
+fun <T> EditTextPreference.bindTo(preference: FlowPreference<T>) {
+    key = preference.key
+    defaultValue = preference.defaultValue.toString()
+}
+
+fun <T> ListMatPreference.bindTo(preference: FlowPreference<T>) {
+    key = preference.key
+    val defValue = preference.defaultValue
+    defaultValue = if (defValue is Set<*>) defValue else defValue.toString()
+}
+
+@Deprecated(
+    "Do not bind tri-states prefs with a single preference",
+    ReplaceWith("bindTo(preference, excludePreference = )"),
+    DeprecationLevel.ERROR,
+)
+fun <T> TriStateListPreference.bindTo(preference: FlowPreference<T>) { key = preference.key }
+
+fun TriStateListPreference.bindTo(
+    includePreference: FlowPreference<Set<String>>,
+    excludePreference: FlowPreference<Set<String>>,
+) {
+    key = includePreference.key
+    excludeKey = excludePreference.key
+    defaultValue = includePreference.defaultValue to excludePreference.defaultValue
+}
+
+fun <T> IntListMatPreference.bindTo(preference: FlowPreference<T>) {
+    key = preference.key
+    defaultValue = preference.defaultValue
+}
+
 fun SwitchPreferenceCompat.requireAuthentication(
     activity: FragmentActivity?,
     title: String,
-    subtitle: String? = null
+    subtitle: String? = null,
+    confirmationRequired: Boolean = true,
 ) {
     onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
         newValue as Boolean
-        if (newValue && activity != null && context.isAuthenticationSupported()) {
+        if (activity != null && context.isAuthenticationSupported()) {
             activity.startAuthentication(
                 title,
                 subtitle,
+                confirmationRequired,
                 callback = object : AuthenticatorUtil.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         super.onAuthenticationSucceeded(result)
@@ -193,7 +221,7 @@ fun SwitchPreferenceCompat.requireAuthentication(
                         super.onAuthenticationError(errorCode, errString)
                         activity.toast(errString.toString())
                     }
-                }
+                },
             )
             false
         } else {
@@ -212,7 +240,7 @@ var Preference.titleRes: Int
 
 var Preference.iconRes: Int
     get() = 0 // set only
-    set(value) { icon = VectorDrawableCompat.create(context.resources, value, context.theme) }
+    set(value) { icon = AppCompatResources.getDrawable(context, value) }
 
 var Preference.summaryRes: Int
     get() = 0 // set only
@@ -220,4 +248,4 @@ var Preference.summaryRes: Int
 
 var Preference.iconTint: Int
     get() = 0 // set only
-    set(value) { DrawableCompat.setTint(icon, value) }
+    set(value) { icon?.setTint(value) }

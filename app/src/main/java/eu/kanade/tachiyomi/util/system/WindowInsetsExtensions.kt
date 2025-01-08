@@ -4,6 +4,7 @@ import android.os.Build
 import android.view.View
 import android.view.WindowInsets
 import androidx.annotation.RequiresApi
+import androidx.core.graphics.Insets
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsCompat.Type.mandatorySystemGestures
 import androidx.core.view.WindowInsetsCompat.Type.systemBars
@@ -20,6 +21,13 @@ fun WindowInsetsCompat.isBottomTappable() =
 val View.rootWindowInsetsCompat
     get() = rootWindowInsets?.let { WindowInsetsCompat.toWindowInsetsCompat(it) }
 
+val WindowInsetsCompat.ignoredSystemInsets: Insets
+    get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        getInsetsIgnoringVisibility(systemBars())
+    } else {
+        getInsets(systemBars())
+    }
+
 fun WindowInsetsCompat.hasSideNavBar() =
     (
         getInsetsIgnoringVisibility(systemBars()).left > 0 ||
@@ -32,8 +40,12 @@ fun WindowInsetsCompat.isImeVisible() = isVisible(WindowInsetsCompat.Type.ime())
 
 fun WindowInsets.topCutoutInset() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
     displayCutout?.safeInsetTop ?: 0
-} else 0
+} else {
+    0
+}
 
 fun WindowInsets.bottomCutoutInset() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
     displayCutout?.safeInsetBottom ?: 0
-} else 0
+} else {
+    0
+}

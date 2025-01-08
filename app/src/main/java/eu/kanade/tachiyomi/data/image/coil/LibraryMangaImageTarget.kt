@@ -1,7 +1,6 @@
 package eu.kanade.tachiyomi.data.image.coil
 
 import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.widget.ImageView
 import androidx.palette.graphics.Palette
@@ -18,22 +17,10 @@ import uy.kohesive.injekt.injectLazy
 
 class LibraryMangaImageTarget(
     override val view: ImageView,
-    val manga: Manga
+    val manga: Manga,
 ) : ImageViewTarget(view) {
 
     private val coverCache: CoverCache by injectLazy()
-
-    override fun onSuccess(result: Drawable) {
-        super.onSuccess(result)
-        if (manga.vibrantCoverColor == null) {
-            val bitmap = (drawable as? BitmapDrawable)?.bitmap ?: return
-            Palette.from(bitmap).generate {
-                if (it == null) return@generate
-                val color = it.getBestColor() ?: return@generate
-                manga.vibrantCoverColor = color
-            }
-        }
-    }
 
     override fun onError(error: Drawable?) {
         super.onError(error)
@@ -47,7 +34,7 @@ class LibraryMangaImageTarget(
                     BitmapFactory.decodeFile(file.path, options)
                     if (options.outWidth == -1 || options.outHeight == -1) {
                         file.delete()
-                        view.context.imageLoader.memoryCache.remove(MemoryCache.Key(manga.key()))
+                        view.context.imageLoader.memoryCache?.remove(MemoryCache.Key(manga.key()))
                     }
                 }
             }
@@ -59,7 +46,7 @@ class LibraryMangaImageTarget(
 inline fun ImageView.loadManga(
     manga: Manga,
     imageLoader: ImageLoader = context.imageLoader,
-    builder: ImageRequest.Builder.() -> Unit = {}
+    builder: ImageRequest.Builder.() -> Unit = {},
 ): Disposable {
     val request = ImageRequest.Builder(context)
         .data(manga)

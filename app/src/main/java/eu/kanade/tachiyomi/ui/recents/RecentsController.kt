@@ -1,23 +1,27 @@
 package eu.kanade.tachiyomi.ui.recents
 
 import android.app.Activity
-import android.content.res.ColorStateList
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
+import android.view.RoundedCorner
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.SearchView
-import androidx.core.graphics.ColorUtils
+import androidx.activity.BackEventCompat
 import androidx.core.view.WindowInsetsCompat.Type.systemBars
+import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.core.view.updatePadding
 import androidx.core.view.updatePaddingRelative
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.transition.TransitionSet
 import com.bluelinelabs.conductor.ControllerChangeHandler
 import com.bluelinelabs.conductor.ControllerChangeType
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -25,52 +29,66 @@ import com.google.android.material.snackbar.BaseTransientBottomBar
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayout
 import eu.davidea.flexibleadapter.FlexibleAdapter
-import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.data.backup.BackupRestoreService
+import eu.kanade.tachiyomi.data.backup.BackupRestoreJob
+import eu.kanade.tachiyomi.data.database.models.Chapter
+import eu.kanade.tachiyomi.data.database.models.ChapterHistory
 import eu.kanade.tachiyomi.data.database.models.History
 import eu.kanade.tachiyomi.data.database.models.Manga
-import eu.kanade.tachiyomi.data.download.DownloadService
+import eu.kanade.tachiyomi.data.download.DownloadJob
 import eu.kanade.tachiyomi.data.download.model.Download
-import eu.kanade.tachiyomi.data.library.LibraryUpdateService
+import eu.kanade.tachiyomi.data.library.LibraryUpdateJob
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.databinding.RecentsControllerBinding
+import eu.kanade.tachiyomi.ui.base.SmallToolbarInterface
 import eu.kanade.tachiyomi.ui.base.controller.BaseCoroutineController
 import eu.kanade.tachiyomi.ui.base.controller.DialogController
 import eu.kanade.tachiyomi.ui.main.BottomSheetController
 import eu.kanade.tachiyomi.ui.main.FloatingSearchInterface
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.main.RootSearchInterface
+import eu.kanade.tachiyomi.ui.main.TabbedInterface
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsController
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.recents.options.TabbedRecentsOptionsSheet
 import eu.kanade.tachiyomi.ui.source.browse.ProgressItem
+import eu.kanade.tachiyomi.util.chapter.updateTrackChapterMarkedAsRead
+import eu.kanade.tachiyomi.util.system.addCheckBoxPrompt
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.getBottomGestureInsets
 import eu.kanade.tachiyomi.util.system.getResourceColor
+import eu.kanade.tachiyomi.util.system.ignoredSystemInsets
 import eu.kanade.tachiyomi.util.system.isLTR
+import eu.kanade.tachiyomi.util.system.isPromptChecked
 import eu.kanade.tachiyomi.util.system.launchUI
+import eu.kanade.tachiyomi.util.system.materialAlertDialog
 import eu.kanade.tachiyomi.util.system.rootWindowInsetsCompat
+import eu.kanade.tachiyomi.util.system.setCustomTitleAndMessage
 import eu.kanade.tachiyomi.util.system.spToPx
 import eu.kanade.tachiyomi.util.system.toInt
 import eu.kanade.tachiyomi.util.view.activityBinding
 import eu.kanade.tachiyomi.util.view.collapse
 import eu.kanade.tachiyomi.util.view.compatToolTipText
 import eu.kanade.tachiyomi.util.view.expand
+import eu.kanade.tachiyomi.util.view.fullAppBarHeight
 import eu.kanade.tachiyomi.util.view.hide
 import eu.kanade.tachiyomi.util.view.isCollapsed
+import eu.kanade.tachiyomi.util.view.isControllerVisible
 import eu.kanade.tachiyomi.util.view.isExpanded
+import eu.kanade.tachiyomi.util.view.isHidden
+import eu.kanade.tachiyomi.util.view.moveRecyclerViewUp
 import eu.kanade.tachiyomi.util.view.requestFilePermissionsSafe
 import eu.kanade.tachiyomi.util.view.scrollViewWith
 import eu.kanade.tachiyomi.util.view.setOnQueryTextChangeListener
 import eu.kanade.tachiyomi.util.view.setStyle
 import eu.kanade.tachiyomi.util.view.smoothScrollToTop
 import eu.kanade.tachiyomi.util.view.snack
+import eu.kanade.tachiyomi.util.view.updateGradiantBGRadius
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
+import eu.kanade.tachiyomi.widget.LinearLayoutManagerAccurateOffset
 import java.util.Locale
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 /**
  * Fragment that shows recently read manga.
@@ -84,45 +102,52 @@ class RecentsController(bundle: Bundle? = null) :
     FlexibleAdapter.OnItemLongClickListener,
     FlexibleAdapter.OnItemMoveListener,
     FlexibleAdapter.EndlessScrollListener,
+    TabbedInterface,
     RootSearchInterface,
     FloatingSearchInterface,
-    BottomSheetController,
-    RemoveHistoryDialog.Listener {
+    BottomSheetController {
 
     init {
         setHasOptionsMenu(true)
         retainViewMode = RetainViewMode.RETAIN_DETACH
     }
 
-    /**
-     * Adapter containing the recent manga.
-     */
+    /** Adapter containing the recent manga. */
     private lateinit var adapter: RecentMangaAdapter
     var displaySheet: TabbedRecentsOptionsSheet? = null
 
     private var progressItem: ProgressItem? = null
-    override var presenter = RecentsPresenter(this)
+    override var presenter = RecentsPresenter()
     private var snack: Snackbar? = null
     private var lastChapterId: Long? = null
     private var showingDownloads = false
-    var headerHeight = 0
+    private var headerHeight = 0
+    private var ogRadius = 0f
+    private var deviceRadius = 0f to 0f
+    private var lastScale = 1f
+
     private var query = ""
         set(value) {
             field = value
             presenter.query = value
         }
 
+    override val mainRecycler: RecyclerView
+        get() = binding.recycler
+
     override fun getTitle(): String? {
-        return if (showingDownloads) {
-            resources?.getString(R.string.download_queue)
-        } else searchTitle(
+        return view?.context?.getString(R.string.recents)
+    }
+
+    override fun getSearchTitle(): String? {
+        return searchTitle(
             view?.context?.getString(
                 when (presenter.viewType) {
-                    RecentsPresenter.VIEW_TYPE_ONLY_HISTORY -> R.string.history
-                    RecentsPresenter.VIEW_TYPE_ONLY_UPDATES -> R.string.updates
+                    RecentsViewType.History -> R.string.history
+                    RecentsViewType.Updates -> R.string.updates
                     else -> R.string.updates_and_history
-                }
-            )?.lowercase(Locale.ROOT)
+                },
+            )?.lowercase(Locale.ROOT),
         )
     }
 
@@ -137,79 +162,105 @@ class RecentsController(bundle: Bundle? = null) :
     override fun onViewCreated(view: View) {
         super.onViewCreated(view)
         // Initialize adapter
+        val isReturning = this::adapter.isInitialized
         adapter = RecentMangaAdapter(this)
         adapter.setPreferenceFlows()
         binding.recycler.adapter = adapter
-        binding.recycler.layoutManager = LinearLayoutManager(view.context)
+        binding.recycler.layoutManager = LinearLayoutManagerAccurateOffset(view.context)
         binding.recycler.setHasFixedSize(true)
         binding.recycler.recycledViewPool.setMaxRecycledViews(0, 0)
-        binding.recycler.addItemDecoration(
-            RecentMangaDivider(view.context)
-        )
+        binding.recycler.addItemDecoration(RecentMangaDivider(view.context))
         adapter.isSwipeEnabled = true
         adapter.itemTouchHelperCallback.setSwipeFlags(
-            if (view.resources.isLTR) ItemTouchHelper.LEFT else ItemTouchHelper.RIGHT
+            if (view.resources.isLTR) ItemTouchHelper.LEFT else ItemTouchHelper.RIGHT,
         )
-        val attrsArray = intArrayOf(R.attr.mainActionBarSize)
-        val array = view.context.obtainStyledAttributes(attrsArray)
-        val appBarHeight = array.getDimensionPixelSize(0, 0)
-        array.recycle()
         binding.swipeRefresh.setStyle()
         scrollViewWith(
             binding.recycler,
             swipeRefreshLayout = binding.swipeRefresh,
-            includeTabView = true,
+            ignoreInsetVisibility = true,
             afterInsets = {
-                headerHeight = it.getInsets(systemBars()).top + appBarHeight + 48.dpToPx
+                val appBarHeight = activityBinding?.appBar?.attrToolbarHeight ?: 0
+                val systemInsets = it.ignoredSystemInsets
+                headerHeight = systemInsets.top + appBarHeight + 48.dpToPx
                 binding.recycler.updatePaddingRelative(
-                    bottom = activityBinding?.bottomNav?.height ?: it.getInsets(systemBars()).bottom
+                    bottom = activityBinding?.bottomNav?.height ?: systemInsets.bottom,
                 )
-                binding.recentsEmptyView.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                    topMargin = headerHeight
-                    bottomMargin =
-                        activityBinding?.bottomNav?.height ?: it.getInsets(systemBars()).bottom
+                binding.downloadBottomSheet.sheetLayout.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                    height = appBarHeight + systemInsets.top
+                }
+                val bigToolbarHeight = fullAppBarHeight ?: 0
+
+                binding.recentsEmptyView.updatePadding(
+                    top = bigToolbarHeight + systemInsets.top,
+                    bottom = activityBinding?.bottomNav?.height ?: systemInsets.bottom,
+                )
+                binding.progress.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                    topMargin = (bigToolbarHeight + systemInsets.top) / 2
                 }
                 if (activityBinding?.bottomNav == null) {
                     setBottomPadding()
                 }
+                deviceRadius = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val wInsets = it.toWindowInsets()
+                    val lCorner = wInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)
+                    val rCorner = wInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_RIGHT)
+                    (lCorner?.radius?.toFloat() ?: 0f) to (rCorner?.radius?.toFloat() ?: 0f)
+                } else {
+                    ogRadius to ogRadius
+                }
             },
             onBottomNavUpdate = {
                 setBottomPadding()
-            }
+            },
         )
 
+        if (!isReturning && adapter.itemCount == 0) {
+            activityBinding?.appBar?.y = 0f
+            activityBinding?.appBar?.updateAppBarAfterY(binding.recycler)
+            activityBinding?.appBar?.lockYPos = true
+        }
         viewScope.launchUI {
             val height =
                 activityBinding?.bottomNav?.height ?: view.rootWindowInsetsCompat?.getInsets(
-                    systemBars()
+                    systemBars(),
                 )?.bottom ?: 0
             binding.recycler.updatePaddingRelative(bottom = height)
             binding.downloadBottomSheet.dlRecycler.updatePaddingRelative(
-                bottom = height
+                bottom = height,
             )
             val isExpanded = binding.downloadBottomSheet.root.sheetBehavior.isExpanded()
-            activityBinding?.tabsFrameLayout?.isVisible = !isExpanded
-            if (isExpanded) {
-                (activity as? MainActivity)?.showTabBar(show = false, animate = false)
-                setRecentsAppBarBG(1f)
-            }
             binding.downloadBottomSheet.dlRecycler.alpha = isExpanded.toInt().toFloat()
-            binding.downloadBottomSheet.sheetLayout.backgroundTintList = ColorStateList.valueOf(
-                ColorUtils.blendARGB(
-                    view.context.getResourceColor(R.attr.colorPrimaryVariant),
-                    view.context.getResourceColor(R.attr.background),
-                    isExpanded.toInt().toFloat()
-                )
-            )
-            binding.downloadBottomSheet.root.backgroundTintList =
-                binding.downloadBottomSheet.sheetLayout.backgroundTintList
+            binding.downloadBottomSheet.titleText.alpha = (!isExpanded).toInt().toFloat()
+            binding.downloadBottomSheet.sheetToolbar.alpha = isExpanded.toInt().toFloat()
+            if (binding.downloadBottomSheet.root.sheetBehavior.isCollapsed()) {
+                if (hasQueue()) {
+                    binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.isHideable =
+                        false
+                } else {
+                    binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.isHideable =
+                        true
+                    binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.state =
+                        BottomSheetBehavior.STATE_HIDDEN
+                }
+            } else if (binding.downloadBottomSheet.root.sheetBehavior.isHidden()) {
+                if (!hasQueue()) {
+                    binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.skipCollapsed =
+                        true
+                } else {
+                    binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.skipCollapsed =
+                        false
+                    binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.state =
+                        BottomSheetBehavior.STATE_COLLAPSED
+                }
+            }
             updateTitleAndMenu()
         }
 
         if (presenter.recentItems.isNotEmpty()) {
             adapter.updateDataSet(presenter.recentItems)
         } else {
-            binding.frameLayout.alpha = 0f
+            binding.recentsFrameLayout.alpha = 0f
         }
 
         binding.downloadBottomSheet.dlBottomSheet.onCreate(this)
@@ -223,61 +274,71 @@ class RecentsController(bundle: Bundle? = null) :
                     // Doing some fun math to hide the tab bar just as the title text of the
                     // dl sheet is under the toolbar
                     val cap = height * (1 / 12600f) + 479f / 700
-                    val elValue = max(
-                        max(0f, (progress - cap)) / (1 - cap),
-                        if (binding.recycler.canScrollVertically(-1)) 1f else 0f
-                    ).coerceIn(0f, 1f)
-                    setRecentsAppBarBG(elValue)
-                    binding.downloadBottomSheet.sheetLayout.alpha = 1 - max(0f, progress / cap)
+                    binding.downloadBottomSheet.titleText.alpha = 1 - max(0f, progress / cap)
+                    binding.downloadBottomSheet.sheetToolbar.alpha = max(0f, progress / cap)
+                    binding.downloadBottomSheet.pill.alpha = binding.downloadBottomSheet.titleText.alpha * 0.25f
                     binding.downloadBottomSheet.dlRecycler.alpha = progress * 10
-                    binding.downloadBottomSheet.sheetLayout.backgroundTintList =
-                        ColorStateList.valueOf(
-                            ColorUtils.blendARGB(
-                                view.context.getResourceColor(R.attr.colorPrimaryVariant),
-                                view.context.getResourceColor(R.attr.background),
-                                (progress * 2f).coerceIn(0f, 1f)
-                            )
-                        )
                     val oldShow = showingDownloads
                     showingDownloads = progress > 0.92f
-                    if (router.backstack.lastOrNull()?.controller != this@RecentsController) {
+                    if (!isControllerVisible) {
                         return
                     }
-                    binding.downloadBottomSheet.root.backgroundTintList =
-                        binding.downloadBottomSheet.sheetLayout.backgroundTintList
-                    activityBinding?.appBar?.y = max(
-                        activityBinding!!.appBar.y,
-                        -headerHeight * (1 - progress)
-                    )
-                    activityBinding?.tabsFrameLayout?.let { tabs ->
-                        tabs.alpha = 1 - max(0f, progress / cap)
-                        if (tabs.alpha <= 0 && tabs.isVisible) {
-                            tabs.isVisible = false
-                        } else if (tabs.alpha > 0 && !tabs.isVisible) {
-                            tabs.isVisible = true
+                    binding.downloadBottomSheet.root.apply {
+                        if (lastScale != 1f && scaleY != 1f) {
+                            val scaleProgress = ((1f - progress) * (1f - lastScale)) + lastScale
+                            scaleX = scaleProgress
+                            scaleY = scaleProgress
+                            for (i in 0 until childCount) {
+                                val childView = getChildAt(i)
+                                childView.scaleY = scaleProgress
+                            }
                         }
                     }
+                    if (isControllerVisible) {
+                        activityBinding?.appBar?.alpha = (1 - progress * 3) + 0.5f
+                    }
+                    binding.downloadBottomSheet.root.updateGradiantBGRadius(
+                        ogRadius,
+                        deviceRadius,
+                        progress,
+                        binding.downloadBottomSheet.sheetLayout,
+                    )
                     if (oldShow != showingDownloads) {
                         updateTitleAndMenu()
-                        activity?.invalidateOptionsMenu()
+                        (activity as? MainActivity)?.reEnableBackPressedCallBack()
                     }
                 }
 
                 override fun onStateChanged(p0: View, state: Int) {
                     if (this@RecentsController.view == null) return
-                    if (state == BottomSheetBehavior.STATE_EXPANDED) activityBinding?.appBar?.y = 0f
                     if (state == BottomSheetBehavior.STATE_EXPANDED || state == BottomSheetBehavior.STATE_COLLAPSED) {
-                        binding.downloadBottomSheet.sheetLayout.alpha =
-                            if (state == BottomSheetBehavior.STATE_COLLAPSED) 1f else 0f
                         showingDownloads = state == BottomSheetBehavior.STATE_EXPANDED
                         updateTitleAndMenu()
-                        activity?.invalidateOptionsMenu()
                     }
 
-                    if (router.backstack.lastOrNull()?.controller == this@RecentsController) {
+                    if (isControllerVisible) {
                         activityBinding?.tabsFrameLayout?.isVisible =
                             state != BottomSheetBehavior.STATE_EXPANDED
                     }
+                    binding.downloadBottomSheet.dlBottomSheet.apply {
+                        if ((
+                            state == BottomSheetBehavior.STATE_COLLAPSED ||
+                                state == BottomSheetBehavior.STATE_EXPANDED ||
+                                state == BottomSheetBehavior.STATE_HIDDEN
+                            ) &&
+                            scaleY != 1f
+                        ) {
+                            scaleX = 1f
+                            scaleY = 1f
+                            pivotY = 0f
+                            translationX = 0f
+                            for (i in 0 until childCount) {
+                                val childView = getChildAt(i)
+                                childView.scaleY = 1f
+                            }
+                        }
+                    }
+
                     if (state == BottomSheetBehavior.STATE_COLLAPSED) {
                         if (hasQueue()) {
                             binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.isHideable =
@@ -315,11 +376,11 @@ class RecentsController(bundle: Bundle? = null) :
                         state == BottomSheetBehavior.STATE_COLLAPSED
                     setPadding(binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.isHideable == true)
                 }
-            }
+            },
         )
-        binding.swipeRefresh.isRefreshing = LibraryUpdateService.isRunning()
+        binding.swipeRefresh.isRefreshing = LibraryUpdateJob.isRunning(view.context)
         binding.swipeRefresh.setOnRefreshListener {
-            if (!LibraryUpdateService.isRunning()) {
+            if (!LibraryUpdateJob.isRunning(view.context)) {
                 snack?.dismiss()
                 snack = view.snack(R.string.updating_library) {
                     anchorView =
@@ -329,11 +390,11 @@ class RecentsController(bundle: Bundle? = null) :
                             activityBinding?.bottomNav ?: binding.downloadBottomSheet.root
                         }
                     setAction(R.string.cancel) {
-                        LibraryUpdateService.stop(context)
+                        LibraryUpdateJob.stop(context)
                         viewScope.launchUI {
                             NotificationReceiver.dismissNotification(
                                 context,
-                                Notifications.ID_LIBRARY_PROGRESS
+                                Notifications.ID_LIBRARY_PROGRESS,
                             )
                         }
                     }
@@ -341,15 +402,16 @@ class RecentsController(bundle: Bundle? = null) :
                         object : BaseTransientBottomBar.BaseCallback<Snackbar>() {
                             override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
                                 super.onDismissed(transientBottomBar, event)
-                                binding.swipeRefresh.isRefreshing = LibraryUpdateService.isRunning()
+                                binding.swipeRefresh.isRefreshing = LibraryUpdateJob.isRunning(view.context)
                             }
-                        }
+                        },
                     )
                 }
-                LibraryUpdateService.start(view.context)
+                LibraryUpdateJob.startNow(view.context)
             }
         }
-
+        ogRadius = view.resources.getDimension(R.dimen.rounded_radius)
+        setSheetToolbar()
         if (showingDownloads) {
             binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.expand()
         }
@@ -359,27 +421,28 @@ class RecentsController(bundle: Bundle? = null) :
         binding.downloadBottomSheet.root.sheetBehavior?.isGestureInsetBottomIgnored = true
     }
 
-    fun updateTitleAndMenu() {
-        if (router.backstack.lastOrNull()?.controller == this) {
-            val activity = (activity as? MainActivity) ?: return
-            activity.setFloatingToolbar(!showingDownloads, true)
-            if (showingDownloads) {
-                setRecentsAppBarBG(1f)
+    private fun setSheetToolbar() {
+        binding.downloadBottomSheet.sheetToolbar.title = view?.context?.getString(R.string.download_queue)
+        binding.downloadBottomSheet.sheetToolbar.overflowIcon?.setTint(view?.context?.getResourceColor(R.attr.actionBarTintColor) ?: Color.BLACK)
+        binding.downloadBottomSheet.sheetToolbar.setOnMenuItemClickListener { item ->
+            return@setOnMenuItemClickListener binding.downloadBottomSheet.dlBottomSheet.onOptionsItemSelected(item)
+        }
+        binding.downloadBottomSheet.sheetToolbar.setNavigationOnClickListener {
+            if (binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.isHideable == true) {
+                binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.hide()
+            } else {
+                binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.collapse()
             }
-            setTitle()
         }
     }
 
-    fun setRecentsAppBarBG(value: Float) {
-        val context = view?.context ?: return
-        val color = ColorUtils.blendARGB(
-            context.getResourceColor(R.attr.colorSurface),
-            context.getResourceColor(R.attr.colorPrimaryVariant),
-            value
-        )
-        activityBinding?.appBar?.setBackgroundColor(color)
-        activity?.window?.statusBarColor =
-            ColorUtils.setAlphaComponent(color, (0.87f * 255).roundToInt())
+    fun updateTitleAndMenu() {
+        if (isControllerVisible) {
+            val activity = (activity as? MainActivity) ?: return
+            activityBinding?.appBar?.isInvisible = showingDownloads
+            (activity as? MainActivity)?.setStatusBarColorTransparent(showingDownloads)
+            setTitle()
+        }
     }
 
     private fun setBottomPadding() {
@@ -387,7 +450,7 @@ class RecentsController(bundle: Bundle? = null) :
         val pad = bottomBar?.translationY?.minus(bottomBar.height) ?: 0f
         val padding = max(
             (-pad).toInt(),
-            view?.rootWindowInsetsCompat?.getBottomGestureInsets() ?: 0
+            view?.rootWindowInsetsCompat?.getBottomGestureInsets() ?: 0,
         )
         binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.peekHeight = 48.spToPx + padding
         binding.downloadBottomSheet.fastScroller.updateLayoutParams<ViewGroup.MarginLayoutParams> {
@@ -396,13 +459,13 @@ class RecentsController(bundle: Bundle? = null) :
         binding.downloadBottomSheet.dlRecycler.updatePaddingRelative(
             bottom = max(
                 -pad.toInt(),
-                view?.rootWindowInsetsCompat?.getInsets(systemBars())?.bottom ?: 0
-            ) + binding.downloadBottomSheet.downloadFab.height + 20.dpToPx
+                view?.rootWindowInsetsCompat?.getInsets(systemBars())?.bottom ?: 0,
+            ) + binding.downloadBottomSheet.downloadFab.height + 20.dpToPx,
         )
         binding.downloadBottomSheet.downloadFab.updateLayoutParams<ViewGroup.MarginLayoutParams> {
             bottomMargin = max(
                 -pad.toInt(),
-                view?.rootWindowInsetsCompat?.getInsets(systemBars())?.bottom ?: 0
+                view?.rootWindowInsetsCompat?.getInsets(systemBars())?.bottom ?: 0,
             ) + 16.dpToPx
         }
         setPadding(binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.isHideable == true)
@@ -421,13 +484,41 @@ class RecentsController(bundle: Bundle? = null) :
             binding.swipeRefresh.isRefreshing
     }
 
-    override fun handleSheetBack(): Boolean {
+    override fun canStillGoBack(): Boolean {
+        return showingDownloads ||
+            presenter.preferences.recentsViewType().get() != presenter.viewType.mainValue
+    }
+
+    override fun handleOnBackStarted(backEvent: BackEventCompat) {
+        if (showingDownloads) {
+            binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.startBackProgress(backEvent)
+        }
+    }
+
+    override fun handleOnBackProgressed(backEvent: BackEventCompat) {
+        if (showingDownloads) {
+            binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.updateBackProgress(backEvent)
+        } else {
+            super.handleOnBackProgressed(backEvent)
+        }
+    }
+
+    override fun handleOnBackCancelled() {
+        if (showingDownloads) {
+            binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.cancelBackProgress()
+        } else {
+            super.handleOnBackCancelled()
+        }
+    }
+
+    override fun handleBack(): Boolean {
         if (showingDownloads) {
             binding.downloadBottomSheet.dlBottomSheet.dismiss()
             return true
         }
-        if (presenter.preferences.recentsViewType().get() != presenter.viewType) {
-            tempJumpTo(presenter.preferences.recentsViewType().get())
+        val viewType = RecentsViewType.valueOf(presenter.preferences.recentsViewType().get())
+        if (viewType != presenter.viewType) {
+            tempJumpTo(viewType)
             return true
         }
         return false
@@ -441,7 +532,7 @@ class RecentsController(bundle: Bundle? = null) :
                 activityBinding?.bottomNav?.height ?: cInsets.getInsets(systemBars()).bottom
             } else {
                 peekHeight
-            }
+            },
         )
     }
 
@@ -452,26 +543,14 @@ class RecentsController(bundle: Bundle? = null) :
             refresh()
         }
         setBottomPadding()
-        binding.downloadBottomSheet.dlBottomSheet.update()
-
-        if (BuildConfig.DEBUG && query.isBlank()) {
-            val searchItem =
-                (activity as? MainActivity)?.binding?.cardToolbar?.menu?.findItem(R.id.action_search)
-            val searchView = searchItem?.actionView as? SearchView ?: return
-            if (router.backstack.lastOrNull()?.controller != this) return
-            setOnQueryTextChangeListener(searchView) {
-                if (query != it) {
-                    query = it ?: return@setOnQueryTextChangeListener false
-                    resetProgressItem()
-                    refresh()
-                }
-                true
-            }
-        }
+        binding.downloadBottomSheet.dlBottomSheet.update(!presenter.downloadManager.isPaused())
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        if (isBindingInitialized) {
+            binding.downloadBottomSheet.root.onDestroy()
+        }
         snack?.dismiss()
         snack = null
     }
@@ -487,38 +566,56 @@ class RecentsController(bundle: Bundle? = null) :
     fun showLists(
         recents: List<RecentMangaItem>,
         hasNewItems: Boolean,
-        shouldMoveToTop: Boolean = false
+        shouldMoveToTop: Boolean = false,
     ) {
         if (view == null) return
+        if (!binding.progress.isVisible && recents.isNotEmpty()) {
+            (activity as? MainActivity)?.showNotificationPermissionPrompt()
+        }
         binding.progress.isVisible = false
-        binding.frameLayout.alpha = 1f
-        binding.swipeRefresh.isRefreshing = LibraryUpdateService.isRunning()
+        binding.recentsFrameLayout.alpha = 1f
+        binding.swipeRefresh.isRefreshing = LibraryUpdateJob.isRunning(view!!.context)
         adapter.removeAllScrollableHeaders()
-        adapter.updateItems(recents)
+        adapter.updateDataSet(recents)
         adapter.onLoadMoreComplete(null)
-        if (!hasNewItems || presenter.viewType == RecentsPresenter.VIEW_TYPE_GROUP_ALL ||
+        if (isControllerVisible) {
+            activityBinding?.appBar?.lockYPos = false
+        }
+        if (!hasNewItems || presenter.viewType == RecentsViewType.GroupedAll ||
             recents.isEmpty()
         ) {
             loadNoMore()
-        } else if (hasNewItems && presenter.viewType != RecentsPresenter.VIEW_TYPE_GROUP_ALL) {
+        } else if (presenter.viewType != RecentsViewType.GroupedAll) {
             resetProgressItem()
         }
         if (recents.isEmpty()) {
             binding.recentsEmptyView.show(
-                if (!isSearching()) R.drawable.ic_history_off_24dp
-                else R.drawable.ic_search_off_24dp,
-                if (isSearching()) R.string.no_results_found
-                else when (presenter.viewType) {
-                    RecentsPresenter.VIEW_TYPE_ONLY_UPDATES -> R.string.no_recent_chapters
-                    RecentsPresenter.VIEW_TYPE_ONLY_HISTORY -> R.string.no_recently_read_manga
-                    else -> R.string.no_recent_read_updated_manga
-                }
+                if (!isSearching()) {
+                    R.drawable.ic_history_off_24dp
+                } else {
+                    R.drawable.ic_search_off_24dp
+                },
+                if (isSearching()) {
+                    R.string.no_results_found
+                } else {
+                    when (presenter.viewType) {
+                        RecentsViewType.Updates -> R.string.no_recent_chapters
+                        RecentsViewType.History -> R.string.no_recently_read_manga
+                        else -> R.string.no_recent_read_updated_manga
+                    }
+                },
             )
         } else {
             binding.recentsEmptyView.hide()
         }
+        val isSearchExpanded = activityBinding?.searchToolbar?.isSearchExpanded == true
         if (shouldMoveToTop) {
-            binding.recycler.scrollToPosition(0)
+            if (isSearchExpanded) {
+                moveRecyclerViewUp(scrollUpAnyway = true)
+            } else {
+                (binding.recycler.layoutManager as? LinearLayoutManager)
+                    ?.scrollToPositionWithOffset(0, 0)
+            }
         }
         if (lastChapterId != null) {
             refreshItem(lastChapterId ?: 0L)
@@ -529,17 +626,28 @@ class RecentsController(bundle: Bundle? = null) :
     fun updateChapterDownload(download: Download, updateDLSheet: Boolean = true) {
         if (view == null) return
         if (updateDLSheet) {
-            binding.downloadBottomSheet.dlBottomSheet.update()
+            binding.downloadBottomSheet.dlBottomSheet.update(!presenter.downloadManager.isPaused())
             binding.downloadBottomSheet.dlBottomSheet.onUpdateProgress(download)
             binding.downloadBottomSheet.dlBottomSheet.onUpdateDownloadedPages(download)
         }
         val id = download.chapter.id ?: return
-        val holder = binding.recycler.findViewHolderForItemId(id) as? RecentMangaHolder ?: return
-        holder.notifyStatus(download.status, download.progress, download.chapter.read, true)
+        val item = adapter.getItemByChapterId(id) ?: return
+        val holder = binding.recycler.findViewHolderForItemId(item.id!!) as? RecentMangaHolder ?: return
+        if (item.id == id) {
+            holder.notifyStatus(download.status, download.progress, download.chapter.read, true)
+        } else {
+            holder.notifySubStatus(
+                download.chapter,
+                download.status,
+                download.progress,
+                download.chapter.read,
+                true,
+            )
+        }
     }
 
-    fun updateDownloadStatus() {
-        binding.downloadBottomSheet.dlBottomSheet.update()
+    fun updateDownloadStatus(isRunning: Boolean) {
+        binding.downloadBottomSheet.dlBottomSheet.update(isRunning)
     }
 
     private fun refreshItem(chapterId: Long) {
@@ -558,13 +666,36 @@ class RecentsController(bundle: Bundle? = null) :
         if (item.status != Download.State.NOT_DOWNLOADED && item.status != Download.State.ERROR) {
             presenter.deleteChapter(chapter, manga)
         } else {
-            if (item.status == Download.State.ERROR) DownloadService.start(view.context)
-            else presenter.downloadChapter(manga, chapter)
+            if (item.status == Download.State.ERROR) {
+                DownloadJob.start(view.context)
+            } else {
+                presenter.downloadChapter(manga, chapter)
+            }
         }
     }
 
     override fun startDownloadNow(position: Int) {
         val chapter = (adapter.getItem(position) as? RecentMangaItem)?.chapter ?: return
+        presenter.startDownloadChapterNow(chapter)
+    }
+
+    override fun downloadChapter(position: Int, chapter: Chapter) {
+        val view = view ?: return
+        val item = adapter.getItem(position) as? RecentMangaItem ?: return
+        val manga = item.mch.manga
+        val status = item.downloadInfo.find { it.chapterId == chapter.id }?.status ?: return
+        if (status != Download.State.NOT_DOWNLOADED && status != Download.State.ERROR) {
+            presenter.deleteChapter(chapter, manga)
+        } else {
+            if (status == Download.State.ERROR) {
+                DownloadJob.start(view.context)
+            } else {
+                presenter.downloadChapter(manga, chapter)
+            }
+        }
+    }
+
+    override fun startDownloadNow(position: Int, chapter: Chapter) {
         presenter.startDownloadChapterNow(chapter)
     }
 
@@ -577,20 +708,43 @@ class RecentsController(bundle: Bundle? = null) :
         onItemLongClick(position)
     }
 
-    fun tempJumpTo(viewType: Int) {
+    override fun onSubChapterClicked(position: Int, chapter: Chapter, view: View) {
+        val manga = (adapter.getItem(position) as? RecentMangaItem)?.mch?.manga ?: return
+        openChapter(view, manga, chapter)
+    }
+
+    override fun areExtraChaptersExpanded(position: Int): Boolean {
+        if (alwaysExpanded()) return true
+        val item = (adapter.getItem(position) as? RecentMangaItem) ?: return false
+        val date = presenter.dateFormat.format(item.mch.history.last_read)
+        val invertDefault = !adapter.collapseGrouped
+        return presenter.expandedSectionsMap["${item.mch.manga} - $date"]?.xor(invertDefault)
+            ?: invertDefault
+    }
+
+    override fun updateExpandedExtraChapters(position: Int, expanded: Boolean) {
+        if (alwaysExpanded()) return
+        val item = (adapter.getItem(position) as? RecentMangaItem) ?: return
+        val date = presenter.dateFormat.format(item.mch.history.last_read)
+        val invertDefault = !adapter.collapseGrouped
+        presenter.expandedSectionsMap["${item.mch.manga} - $date"] = expanded.xor(invertDefault)
+    }
+
+    fun tempJumpTo(viewType: RecentsViewType) {
         presenter.toggleGroupRecents(viewType, false)
-        activityBinding?.mainTabs?.selectTab(activityBinding?.mainTabs?.getTabAt(viewType))
+        activityBinding?.mainTabs?.run { selectTab(getTabAt(viewType.mainValue)) }
+        (activity as? MainActivity)?.reEnableBackPressedCallBack()
         updateTitleAndMenu()
     }
 
-    private fun setViewType(viewType: Int) {
+    private fun setViewType(viewType: RecentsViewType) {
         if (viewType != presenter.viewType) {
             presenter.toggleGroupRecents(viewType)
             updateTitleAndMenu()
         }
     }
 
-    override fun getViewType(): Int = presenter.viewType
+    override fun getViewType(): RecentsViewType = presenter.viewType
 
     override fun scope() = viewScope
 
@@ -601,31 +755,73 @@ class RecentsController(bundle: Bundle? = null) :
                 val headerItem = adapter.getHeaderOf(item) as? RecentMangaHeaderItem
                 tempJumpTo(
                     when (headerItem?.recentsType) {
-                        RecentMangaHeaderItem.NEW_CHAPTERS -> RecentsPresenter.VIEW_TYPE_ONLY_UPDATES
-                        RecentMangaHeaderItem.CONTINUE_READING -> RecentsPresenter.VIEW_TYPE_ONLY_HISTORY
+                        RecentMangaHeaderItem.NEW_CHAPTERS -> RecentsViewType.Updates
+                        RecentMangaHeaderItem.CONTINUE_READING -> RecentsViewType.History
                         else -> return false
-                    }
+                    },
                 )
             } else {
-                val activity = activity ?: return false
-                val intent = ReaderActivity.newIntent(activity, item.mch.manga, item.chapter)
-                startActivity(intent)
+                if (activity == null) return false
+                openChapter(view?.findViewById(R.id.main_view), item.mch.manga, item.chapter)
             }
         } else if (item is RecentMangaHeaderItem) return false
         return true
     }
 
-    override fun onItemLongClick(position: Int) {
-        val item = adapter.getItem(position) as? RecentMangaItem ?: return
-        val manga = item.mch.manga
-        val history = item.mch.history
-        val chapter = item.mch.chapter
-        if (history.id != null) {
-            RemoveHistoryDialog(this, manga, history, chapter).showDialog(router)
+    private fun openChapter(view: View?, manga: Manga, chapter: Chapter) {
+        val activity = activity ?: return
+        activity.apply {
+            if (view != null) {
+                val (intent, bundle) = ReaderActivity
+                    .newIntentWithTransitionOptions(activity, manga, chapter, view)
+                startActivity(intent, bundle)
+            } else {
+                val intent = ReaderActivity.newIntent(activity, manga, chapter)
+                startActivity(intent)
+            }
         }
     }
 
-    override fun removeHistory(manga: Manga, history: History, all: Boolean) {
+    override fun onItemLongClick(position: Int) {
+        val item = adapter.getItem(position) as? RecentMangaItem ?: return
+        showRemoveHistoryDialog(item.mch.manga, item.mch.history, item.mch.chapter)
+    }
+
+    override fun onItemLongClick(position: Int, chapter: ChapterHistory): Boolean {
+        val history = chapter.history ?: return false
+        val item = adapter.getItem(position) as? RecentMangaItem ?: return false
+        if (history.id != null) {
+            showRemoveHistoryDialog(item.mch.manga, history, chapter)
+        }
+        return history.id != null
+    }
+
+    private fun showRemoveHistoryDialog(manga: Manga, history: History, chapter: Chapter) {
+        val activity = activity ?: return
+        if (history.id != null) {
+            activity.materialAlertDialog()
+                .setCustomTitleAndMessage(
+                    R.string.reset_chapter_question,
+                    activity.getString(
+                        R.string.this_will_remove_the_read_date_for_x_question,
+                        chapter.name,
+                    ),
+                )
+                .addCheckBoxPrompt(
+                    activity.getString(
+                        R.string.reset_all_chapters_for_this_,
+                        manga.seriesType(activity),
+                    ),
+                )
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.reset) { dialog, _ ->
+                    removeHistory(manga, history, dialog.isPromptChecked)
+                }
+                .show()
+        }
+    }
+
+    private fun removeHistory(manga: Manga, history: History, all: Boolean) {
         if (all) {
             // Reset last read of chapter to 0L
             presenter.removeAllFromHistory(manga.id!!)
@@ -636,8 +832,19 @@ class RecentsController(bundle: Bundle? = null) :
     }
 
     override fun markAsRead(position: Int) {
+        val preferences = presenter.preferences
+        val db = presenter.db
         val item = adapter.getItem(position) as? RecentMangaItem ?: return
-        val chapter = item.chapter
+        val holder = binding.recycler.findViewHolderForAdapterPosition(position)
+        val holderId = (holder as? RecentMangaHolder)?.chapterId
+        adapter.notifyItemChanged(position)
+        val transition = TransitionSet().addTransition(androidx.transition.Fade())
+        transition.duration = view!!.resources.getInteger(android.R.integer.config_shortAnimTime)
+            .toLong()
+        androidx.transition.TransitionManager.beginDelayedTransition(binding.recycler, transition)
+        if (holderId == -1L) return
+        val chapter = holderId?.let { item.mch.extraChapters.find { holderId == it.id } }
+            ?: item.chapter
         val manga = item.mch.manga
         val lastRead = chapter.last_page_read
         val pagesLeft = chapter.pages_left
@@ -645,9 +852,12 @@ class RecentsController(bundle: Bundle? = null) :
         val wasRead = chapter.read
         presenter.markChapterRead(chapter, !wasRead)
         snack = view?.snack(
-            if (wasRead) R.string.marked_as_unread
-            else R.string.marked_as_read,
-            Snackbar.LENGTH_INDEFINITE
+            if (wasRead) {
+                R.string.marked_as_unread
+            } else {
+                R.string.marked_as_read
+            },
+            Snackbar.LENGTH_INDEFINITE,
         ) {
             anchorView = activityBinding?.bottomNav
             var undoing = false
@@ -659,54 +869,45 @@ class RecentsController(bundle: Bundle? = null) :
                 object : BaseTransientBottomBar.BaseCallback<Snackbar>() {
                     override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
                         super.onDismissed(transientBottomBar, event)
-                        if (!undoing && presenter.preferences.removeAfterMarkedAsRead() &&
-                            !wasRead
-                        ) {
-                            lastChapterId = chapter.id
-                            presenter.deleteChapter(chapter, manga)
+                        if (!undoing && !wasRead) {
+                            if (preferences.removeAfterMarkedAsRead()) {
+                                lastChapterId = chapter.id
+                                presenter.deleteChapter(chapter, manga)
+                            }
+                            updateTrackChapterMarkedAsRead(db, preferences, chapter, manga.id) {
+                                (router.backstack.lastOrNull()?.controller as? MangaDetailsController)?.presenter?.fetchTracks()
+                            }
                         }
                     }
-                }
+                },
             )
         }
         (activity as? MainActivity)?.setUndoSnackBar(snack)
     }
 
-    override fun isSearching() = query.isNotEmpty()
+    private fun isSearching() = query.isNotEmpty()
+    override fun alwaysExpanded() =
+        query.isNotEmpty() || (presenter.viewType.isHistory && !presenter.groupHistory.isByTime)
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        if (onRoot) (activity as? MainActivity)?.setDismissIcon(showingDownloads)
-        if (showingDownloads) {
-            inflater.inflate(R.menu.download_queue, menu)
-        } else {
-            inflater.inflate(R.menu.recents, menu)
+        inflater.inflate(R.menu.recents, menu)
 
-            val searchItem = menu.findItem(R.id.action_search)
-            val searchView = searchItem.actionView as SearchView
-            searchView.queryHint = view?.context?.getString(R.string.search_recents)
-            searchItem.collapseActionView()
-            if (isSearching()) {
-                searchItem.expandActionView()
-                searchView.setQuery(query, true)
-                searchView.clearFocus()
-            }
-            setOnQueryTextChangeListener(searchView) {
-                if (query != it) {
-                    query = it ?: return@setOnQueryTextChangeListener false
-                    // loadNoMore()
-                    resetProgressItem()
-                    refresh()
-                }
-                true
-            }
-            searchItem.fixExpandInvalidate()
-            hideItemsIfExpanded(searchItem, menu)
+        val searchItem = activityBinding?.searchToolbar?.searchItem
+        val searchView = activityBinding?.searchToolbar?.searchView
+        activityBinding?.searchToolbar?.setQueryHint(view?.context?.getString(R.string.search_recents), !isSearching())
+        if (isSearching()) {
+            searchItem?.expandActionView()
+            searchView?.setQuery(query, true)
+            searchView?.clearFocus()
         }
-    }
-
-    override fun onPrepareOptionsMenu(menu: Menu) {
-        super.onPrepareOptionsMenu(menu)
-        if (showingDownloads) binding.downloadBottomSheet.dlBottomSheet.prepareMenu(menu)
+        setOnQueryTextChangeListener(activityBinding?.searchToolbar?.searchView) {
+            if (query != it) {
+                query = it ?: return@setOnQueryTextChangeListener false
+                resetProgressItem()
+                refresh()
+            }
+            true
+        }
     }
 
     override fun onChangeStarted(handler: ControllerChangeHandler, type: ControllerChangeType) {
@@ -714,39 +915,38 @@ class RecentsController(bundle: Bundle? = null) :
         if (type.isEnter) {
             if (type == ControllerChangeType.POP_ENTER) presenter.onCreate()
             binding.downloadBottomSheet.dlBottomSheet.dismiss()
-            activityBinding?.mainTabs?.let { tabs ->
-                tabs.removeAllTabs()
-                tabs.clearOnTabSelectedListeners()
-                val selectedTab = presenter.viewType
-                listOf(
-                    R.string.grouped,
-                    R.string.all,
-                    R.string.history,
-                    R.string.updates
-                ).forEachIndexed { index, resId ->
-                    tabs.addTab(
-                        tabs.newTab().setText(resId).also { tab ->
-                            tab.view.compatToolTipText = null
-                        },
-                        index == selectedTab
-                    )
-                }
-                tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-                    override fun onTabSelected(tab: TabLayout.Tab?) {
-                        setViewType(tab?.position ?: 0)
+            if (isControllerVisible) {
+                activityBinding?.mainTabs?.let { tabs ->
+                    tabs.removeAllTabs()
+                    tabs.clearOnTabSelectedListeners()
+                    val selectedTab = presenter.viewType
+                    RecentsViewType.entries.forEach { viewType ->
+                        tabs.addTab(
+                            tabs.newTab().setText(viewType.stringRes).also { tab ->
+                                tab.view.compatToolTipText = null
+                            },
+                            viewType == selectedTab,
+                        )
                     }
+                    tabs.addOnTabSelectedListener(
+                        object : TabLayout.OnTabSelectedListener {
+                            override fun onTabSelected(tab: TabLayout.Tab?) {
+                                setViewType(RecentsViewType.valueOf(tab?.position))
+                            }
 
-                    override fun onTabUnselected(tab: TabLayout.Tab?) {}
-                    override fun onTabReselected(tab: TabLayout.Tab?) {
-                        binding.recycler.smoothScrollToTop()
-                    }
-                })
-                (activity as? MainActivity)?.showTabBar(true)
+                            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+                            override fun onTabReselected(tab: TabLayout.Tab?) {
+                                binding.recycler.smoothScrollToTop()
+                            }
+                        },
+                    )
+                    (activity as? MainActivity)?.showTabBar(true)
+                }
             }
         } else {
-            if (type == ControllerChangeType.POP_EXIT) presenter.onDestroy()
-            if (router.backstack.lastOrNull()?.controller !is DialogController) {
-                (activity as? MainActivity)?.showTabBar(false)
+            val lastController = router.backstack.lastOrNull()?.controller
+            if (lastController !is DialogController) {
+                (activity as? MainActivity)?.showTabBar(show = false, animate = lastController !is SmallToolbarInterface)
             }
             snack?.dismiss()
         }
@@ -758,7 +958,7 @@ class RecentsController(bundle: Bundle? = null) :
         if (type == ControllerChangeType.POP_ENTER) {
             setBottomPadding()
         }
-        if (type.isEnter) {
+        if (type.isEnter && isControllerVisible) {
             updateTitleAndMenu()
         }
     }
@@ -782,29 +982,27 @@ class RecentsController(bundle: Bundle? = null) :
     }
 
     override fun toggleSheet() {
-        if (showingDownloads) binding.downloadBottomSheet.dlBottomSheet.dismiss()
-        else binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.expand()
+        if (showingDownloads) {
+            binding.downloadBottomSheet.dlBottomSheet.dismiss()
+        } else {
+            binding.downloadBottomSheet.dlBottomSheet.sheetBehavior?.expand()
+        }
     }
-
-    override fun sheetIsFullscreen(): Boolean = binding.downloadBottomSheet.dlBottomSheet.sheetBehavior.isExpanded()
 
     override fun expandSearch() {
         if (showingDownloads) {
             binding.downloadBottomSheet.dlBottomSheet.dismiss()
         } else {
-            activityBinding?.cardToolbar?.menu?.findItem(R.id.action_search)?.expandActionView()
+            activityBinding?.searchToolbar?.menu?.findItem(R.id.action_search)?.expandActionView()
         }
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (showingDownloads) {
-            return binding.downloadBottomSheet.dlBottomSheet.onOptionsItemSelected(item)
-        }
         when (item.itemId) {
             R.id.display_options -> {
                 displaySheet = TabbedRecentsOptionsSheet(
                     this,
-                    (presenter.viewType - 1).coerceIn(0, 2)
+                    (presenter.viewType.mainValue - 1).coerceIn(0, 2),
                 )
                 displaySheet?.show()
             }
@@ -817,11 +1015,8 @@ class RecentsController(bundle: Bundle? = null) :
     override fun onLoadMore(lastPosition: Int, currentPage: Int) {
         val view = view ?: return
         if (presenter.finished ||
-            BackupRestoreService.isRunning(view.context.applicationContext) ||
-            (
-                presenter.viewType == RecentsPresenter.VIEW_TYPE_GROUP_ALL &&
-                    !isSearching()
-                )
+            BackupRestoreJob.isRunning(view.context.applicationContext) ||
+            (presenter.viewType == RecentsViewType.GroupedAll && !isSearching())
         ) {
             loadNoMore()
             return

@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.reader.settings
 
+import android.animation.ValueAnimator
 import android.view.View
 import android.view.WindowManager
 import androidx.core.content.ContextCompat
@@ -18,41 +19,51 @@ import eu.kanade.tachiyomi.widget.TabbedBottomSheetDialog
 
 class TabbedReaderSettingsSheet(
     val readerActivity: ReaderActivity,
-    showColorFilterSettings: Boolean = false
+    showColorFilterSettings: Boolean = false,
 ) : TabbedBottomSheetDialog(readerActivity) {
     private val generalView: ReaderGeneralView = View.inflate(
         readerActivity,
         R.layout.reader_general_layout,
-        null
+        null,
     ) as ReaderGeneralView
     private val pagedView: ReaderPagedView = View.inflate(
         readerActivity,
         R.layout.reader_paged_layout,
-        null
+        null,
     ) as ReaderPagedView
     private val filterView: ReaderFilterView = View.inflate(
         readerActivity,
         R.layout.reader_color_filter,
-        null
+        null,
     ) as ReaderFilterView
 
     var showWebtoonView: Boolean = run {
-        val mangaViewer = readerActivity.presenter.getMangaReadingMode()
+        val mangaViewer = readerActivity.viewModel.getMangaReadingMode()
         ReadingModeType.isWebtoonType(mangaViewer)
     }
 
     override var offset = 0
 
+    private val backgroundDimAnimator by lazy {
+        val sheetBackgroundDim = window?.attributes?.dimAmount ?: 0.25f
+        ValueAnimator.ofFloat(sheetBackgroundDim, 0f).also { valueAnimator ->
+            valueAnimator.duration = 250
+            valueAnimator.addUpdateListener {
+                window?.setDimAmount(it.animatedValue as Float)
+            }
+        }
+    }
+
     override fun getTabViews(): List<View> = listOf(
         generalView,
         pagedView,
-        filterView
+        filterView,
     )
 
     override fun getTabTitles(): List<Int> = listOf(
         R.string.general,
         if (showWebtoonView) R.string.webtoon else R.string.paged,
-        R.string.filter
+        R.string.filter,
     )
 
     init {
@@ -77,8 +88,8 @@ class TabbedReaderSettingsSheet(
         binding.menu.setImageDrawable(
             ContextCompat.getDrawable(
                 context,
-                R.drawable.ic_outline_settings_24dp
-            )
+                R.drawable.ic_outline_settings_24dp,
+            ),
         )
         binding.menu.setOnClickListener {
             val intent = SearchActivity.openReaderSettings(readerActivity)
@@ -87,30 +98,42 @@ class TabbedReaderSettingsSheet(
         }
 
         val attrs = window?.attributes
-        val ogDim = attrs?.dimAmount ?: 0.25f
         val filterTabIndex = getTabViews().indexOf(filterView)
         binding.pager.adapter?.notifyDataSetChanged()
-        binding.tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab?) {
-                window?.setDimAmount(if (tab?.position == filterTabIndex) 0f else ogDim)
-                readerActivity.binding.appBar.isInvisible = tab?.position == filterTabIndex
-                if (tab?.position == 2) {
-                    sheetBehavior.skipCollapsed = false
-                    sheetBehavior.peekHeight = 110.dpToPx
-                    filterView.setWindowBrightness()
-                } else {
-                    sheetBehavior.expand()
-                    sheetBehavior.skipCollapsed = true
-                    window?.attributes = window?.attributes?.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+        binding.tabs.addOnTabSelectedListener(
+            object : TabLayout.OnTabSelectedListener {
+                override fun onTabSelected(tab: TabLayout.Tab?) {
+                    val isFilterTab = tab?.position == filterTabIndex
+
+                    // Remove dimmed backdrop so color filter changes can be previewed
+                    backgroundDimAnimator.run {
+                        if (isFilterTab) {
+                            if (animatedFraction < 1f) {
+                                start()
+                            }
+                        } else if (animatedFraction > 0f) {
+                            reverse()
+                        }
+                    }
+                    readerActivity.binding.appBar.isInvisible = tab?.position == filterTabIndex
+                    if (tab?.position == 2) {
+                        sheetBehavior.skipCollapsed = false
+                        sheetBehavior.peekHeight = 110.dpToPx
+                        filterView.setWindowBrightness()
+                    } else {
+                        sheetBehavior.expand()
+                        sheetBehavior.skipCollapsed = true
+                        window?.attributes = window?.attributes?.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+                    }
                 }
-            }
 
-            override fun onTabUnselected(tab: TabLayout.Tab?) {
-            }
+                override fun onTabUnselected(tab: TabLayout.Tab?) {
+                }
 
-            override fun onTabReselected(tab: TabLayout.Tab?) {
-            }
-        })
+                override fun onTabReselected(tab: TabLayout.Tab?) {
+                }
+            },
+        )
 
         if (showColorFilterSettings) {
             binding.tabs.getTabAt(filterTabIndex)?.select()
@@ -126,6 +149,9 @@ class TabbedReaderSettingsSheet(
     override fun dismiss() {
         super.dismiss()
         readerActivity.binding.appBar.isVisible = true
+        if (pagedView.needsActivityRecreate) {
+            readerActivity.recreate()
+        }
     }
 
     fun updateTabs(isWebtoon: Boolean) {

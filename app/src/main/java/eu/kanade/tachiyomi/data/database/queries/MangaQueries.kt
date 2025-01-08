@@ -1,11 +1,13 @@
 package eu.kanade.tachiyomi.data.database.queries
 
+import com.pushtorefresh.storio.Queries
 import com.pushtorefresh.storio.sqlite.queries.DeleteQuery
 import com.pushtorefresh.storio.sqlite.queries.Query
 import com.pushtorefresh.storio.sqlite.queries.RawQuery
 import eu.kanade.tachiyomi.data.database.DbProvider
 import eu.kanade.tachiyomi.data.database.models.LibraryManga
 import eu.kanade.tachiyomi.data.database.models.Manga
+import eu.kanade.tachiyomi.data.database.models.SourceIdMangaCount
 import eu.kanade.tachiyomi.data.database.resolvers.LibraryMangaGetResolver
 import eu.kanade.tachiyomi.data.database.resolvers.MangaDateAddedPutResolver
 import eu.kanade.tachiyomi.data.database.resolvers.MangaFavoritePutResolver
@@ -14,6 +16,7 @@ import eu.kanade.tachiyomi.data.database.resolvers.MangaFlagsPutResolver
 import eu.kanade.tachiyomi.data.database.resolvers.MangaInfoPutResolver
 import eu.kanade.tachiyomi.data.database.resolvers.MangaLastUpdatedPutResolver
 import eu.kanade.tachiyomi.data.database.resolvers.MangaTitlePutResolver
+import eu.kanade.tachiyomi.data.database.resolvers.SourceIdMangaCountGetResolver
 import eu.kanade.tachiyomi.data.database.tables.CategoryTable
 import eu.kanade.tachiyomi.data.database.tables.ChapterTable
 import eu.kanade.tachiyomi.data.database.tables.MangaCategoryTable
@@ -26,7 +29,7 @@ interface MangaQueries : DbProvider {
         .withQuery(
             Query.builder()
                 .table(MangaTable.TABLE)
-                .build()
+                .build(),
         )
         .prepare()
 
@@ -36,9 +39,24 @@ interface MangaQueries : DbProvider {
             RawQuery.builder()
                 .query(libraryQuery)
                 .observesTables(MangaTable.TABLE, ChapterTable.TABLE, MangaCategoryTable.TABLE, CategoryTable.TABLE)
-                .build()
+                .build(),
         )
         .withGetResolver(LibraryMangaGetResolver.INSTANCE)
+        .prepare()
+
+    fun getDuplicateLibraryManga(manga: Manga) = db.get()
+        .`object`(Manga::class.java)
+        .withQuery(
+            Query.builder()
+                .table(MangaTable.TABLE)
+                .where("${MangaTable.COL_FAVORITE} = 1 AND LOWER(${MangaTable.COL_TITLE}) = ? AND ${MangaTable.COL_SOURCE} != ?")
+                .whereArgs(
+                    manga.title.lowercase(),
+                    manga.source,
+                )
+                .limit(1)
+                .build(),
+        )
         .prepare()
 
     fun getFavoriteMangas() = db.get()
@@ -49,7 +67,7 @@ interface MangaQueries : DbProvider {
                 .where("${MangaTable.COL_FAVORITE} = ?")
                 .whereArgs(1)
                 .orderBy(MangaTable.COL_TITLE)
-                .build()
+                .build(),
         )
         .prepare()
 
@@ -60,7 +78,7 @@ interface MangaQueries : DbProvider {
                 .table(MangaTable.TABLE)
                 .where("${MangaTable.COL_URL} = ? AND ${MangaTable.COL_SOURCE} = ?")
                 .whereArgs(url, sourceId)
-                .build()
+                .build(),
         )
         .prepare()
 
@@ -71,8 +89,19 @@ interface MangaQueries : DbProvider {
                 .table(MangaTable.TABLE)
                 .where("${MangaTable.COL_ID} = ?")
                 .whereArgs(id)
-                .build()
+                .build(),
         )
+        .prepare()
+
+    fun getSourceIdsWithNonLibraryManga() = db.get()
+        .listOfObjects(SourceIdMangaCount::class.java)
+        .withQuery(
+            RawQuery.builder()
+                .query(getSourceIdsWithNonLibraryMangaQuery())
+                .observesTables(MangaTable.TABLE)
+                .build(),
+        )
+        .withGetResolver(SourceIdMangaCountGetResolver.INSTANCE)
         .prepare()
 
     fun insertManga(manga: Manga) = db.put().`object`(manga).prepare()
@@ -128,13 +157,29 @@ interface MangaQueries : DbProvider {
 
     fun deleteMangas(mangas: List<Manga>) = db.delete().objects(mangas).prepare()
 
-    fun deleteMangasNotInLibrary() = db.delete()
+    fun deleteMangasNotInLibraryBySourceIds(sourceIds: List<Long>) = db.delete()
         .byQuery(
             DeleteQuery.builder()
                 .table(MangaTable.TABLE)
-                .where("${MangaTable.COL_FAVORITE} = ?")
-                .whereArgs(0)
-                .build()
+                .where("${MangaTable.COL_FAVORITE} = ? AND ${MangaTable.COL_SOURCE} IN (${Queries.placeholders(sourceIds.size)})")
+                .whereArgs(0, *sourceIds.toTypedArray())
+                .build(),
+        )
+        .prepare()
+
+    fun deleteMangasNotInLibraryAndNotReadBySourceIds(sourceIds: List<Long>) = db.delete()
+        .byQuery(
+            DeleteQuery.builder()
+                .table(MangaTable.TABLE)
+                .where(
+                    """
+                    ${MangaTable.COL_FAVORITE} = ? AND ${MangaTable.COL_SOURCE} IN (${Queries.placeholders(sourceIds.size)}) AND ${MangaTable.COL_ID} NOT IN (
+                        SELECT ${ChapterTable.COL_MANGA_ID} FROM ${ChapterTable.TABLE} WHERE ${ChapterTable.COL_READ} = 1 OR ${ChapterTable.COL_LAST_PAGE_READ} != 0
+                    )
+                    """.trimIndent(),
+                )
+                .whereArgs(0, *sourceIds.toTypedArray())
+                .build(),
         )
         .prepare()
 
@@ -142,7 +187,16 @@ interface MangaQueries : DbProvider {
         .byQuery(
             DeleteQuery.builder()
                 .table(MangaTable.TABLE)
-                .build()
+                .build(),
+        )
+        .prepare()
+
+    fun getReadNotInLibraryMangas() = db.get()
+        .listOfObjects(Manga::class.java)
+        .withQuery(
+            RawQuery.builder()
+                .query(getReadMangaNotInLibraryQuery())
+                .build(),
         )
         .prepare()
 
@@ -152,7 +206,7 @@ interface MangaQueries : DbProvider {
             RawQuery.builder()
                 .query(getLastReadMangaQuery())
                 .observesTables(MangaTable.TABLE)
-                .build()
+                .build(),
         )
         .prepare()
 
@@ -162,7 +216,7 @@ interface MangaQueries : DbProvider {
             RawQuery.builder()
                 .query(getLastFetchedMangaQuery())
                 .observesTables(MangaTable.TABLE)
-                .build()
+                .build(),
         )
         .prepare()
 

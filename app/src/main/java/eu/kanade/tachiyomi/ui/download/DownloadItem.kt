@@ -3,12 +3,15 @@ package eu.kanade.tachiyomi.ui.download
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 import eu.davidea.flexibleadapter.FlexibleAdapter
-import eu.davidea.flexibleadapter.items.AbstractFlexibleItem
+import eu.davidea.flexibleadapter.items.AbstractSectionableItem
 import eu.davidea.flexibleadapter.items.IFlexible
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.model.Download
 
-class DownloadItem(val download: Download) : AbstractFlexibleItem<DownloadHolder>() {
+class DownloadItem(
+    val download: Download,
+    header: DownloadHeaderItem,
+) : AbstractSectionableItem<DownloadHolder, DownloadHeaderItem>(header) {
 
     /**
      * Whether this item is currently selected.
@@ -31,7 +34,7 @@ class DownloadItem(val download: Download) : AbstractFlexibleItem<DownloadHolder
     override fun createViewHolder(
         view: View,
         adapter: FlexibleAdapter<IFlexible<RecyclerView
-                .ViewHolder>>
+                .ViewHolder,>,>,
     ): DownloadHolder {
         return DownloadHolder(view, adapter as DownloadAdapter)
     }
@@ -48,7 +51,7 @@ class DownloadItem(val download: Download) : AbstractFlexibleItem<DownloadHolder
         adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>,
         holder: DownloadHolder,
         position: Int,
-        payloads: MutableList<Any>
+        payloads: MutableList<Any>,
     ) {
         holder.bind(download)
     }
